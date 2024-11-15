@@ -9,6 +9,15 @@ from typing import List, Tuple, Dict
 
 from collections import namedtuple
 
+# We need to integrate over the surface of the golgi apparatus
+# to find the center of mass of the golgi apparatus
+
+# Base the integration off of the shape found from convex hull over layed on top
+# of the original image to find the actual center of mass
+
+# Find the Cilia base and then if there is a Cilia within some delta distance 
+# in the radius of the Cilia base, then we can say that the Cilia is attached to the Cilia base
+
 DATA_DIR = Path(__file__).parent / "data"
 Sharpness = namedtuple("Sharpness", ["z", "c", "sharpness"])
 
@@ -183,12 +192,12 @@ def main():
     sample = files[0]
     img = tifffile.imread(sample)
     z_slices = find_best_zslices(img)
-    # demo_sample(img, z_slices)
+    demo_sample(img, z_slices)
     cluster_masks = find_clusters(img, z_slices)
-    plot_image(
-        np.stack(cluster_masks, axis=0),
-        title="Cluster Masks",
-    )
+    # plot_image(
+    #     np.stack(cluster_masks, axis=0),
+    #     title="Cluster Masks",
+    # )
 
 
 if __name__ == "__main__":
