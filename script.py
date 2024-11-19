@@ -26,7 +26,7 @@ notes:
  - data is shaped as (z, c, y, x)
 """
 
-
+# We need a more adaptive thresholding algorithm.
 def threshold_image(
     img: np.ndarray,
     z_slices: Sharpness,
@@ -59,14 +59,17 @@ def find_contours(
         )
     return contours
 
-
+# Visualize steps in the process of creating a final plot.
+# Create the 3x3 grid of subplots, each being a specific channel and a step in the process.
+# img is the raw tif file.
+# z_slices are the clearest z-slices.
 def demo_sample(
     img: np.ndarray,
     z_slices: Sharpness,
     threshold_ps: Tuple[float] = (0.81, 0.81, 0.81),
 ) -> None:
 
-    # img has 3 channels, plot all
+    # axs is a 2d array like an automatically scaled table.
     fig, axs = plt.subplots(3, 3, figsize=(8, 8))
     channels = [
         "Cilia",
@@ -76,6 +79,7 @@ def demo_sample(
 
     thresh = threshold_image(img, z_slices, threshold_ps)
     contours = find_contours(thresh)
+    # Set up subplots for raw image, thresholded image, and then contoured image.
     for i, channel in enumerate(channels):
         axs[0][i].imshow(img[z_slices[i].z, i], cmap="gray")
         axs[0][i].set_title(f"{channel} Channel")
@@ -186,13 +190,14 @@ def find_clusters(
 
     return cluster_masks
 
-
 def main():
-    files = list(DATA_DIR.glob("*.tif"))
-    sample = files[0]
-    img = tifffile.imread(sample)
-    z_slices = find_best_zslices(img)
-    demo_sample(img, z_slices)
+    files = list(DATA_DIR.glob("**/*.tif"))
+    print(len(files))
+    for sample in files:
+        print("Showing plot for " + sample.name)
+        img = tifffile.imread(sample)
+        z_slices = find_best_zslices(img)
+        demo_sample(img, z_slices)
     cluster_masks = find_clusters(img, z_slices)
     # plot_image(
     #     np.stack(cluster_masks, axis=0),
