@@ -6,6 +6,7 @@ from sklearn.cluster import DBSCAN
 
 from pathlib import Path
 from typing import List, Tuple, Dict
+import heapq
 
 from collections import namedtuple
 
@@ -30,20 +31,43 @@ notes:
 def threshold_image(
     img: np.ndarray,
     z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.81, 0.81, 0.81),
+    threshold_ps: Tuple[float] = (0.98, 0.98, 0.98),
     channels: List[str] = ["Cilia", "Golgi", "Cilia Base"],
 ) -> cv2.threshold:
-    threses = []
+    thresholded = []
+    # img = np.uint8(img)
     for i, channel in enumerate(channels):
+        # thresh = cv2.adaptiveThreshold(
+        #     img[z_slices[i].z, i],
+        #     get_percentile_brightness(threshold_ps[i], img[z_slices[i].z, i]),
+        #     cv2.ADAPTIVE_THRESH_MEAN_C,
+        #     cv2.THRESH_BINARY,
+        #     21, # For different zooms, this will also need to be modified
+        #     -100 # The lower, the relatively brigher a pixel has to be to its surroundings to be included.
+                
+        # )
+        percentile_brightness = get_percentile_brightness(threshold_ps[i], img[z_slices[i].z, i])
+        print(percentile_brightness)
         ret, thresh = cv2.threshold(
             img[z_slices[i].z, i],
-            threshold_ps[i] * img[z_slices[i].z, i].max(),
+            percentile_brightness,
             img[z_slices[i].z, i].max(),
-            cv2.THRESH_BINARY,
+            cv2.THRESH_TOZERO,
         )
-        threses.append(thresh)
-    return np.stack(threses, axis=0)
+        thresholded.append(thresh)
+    return np.stack(thresholded, axis=0)
 
+# 81% of the max brightness pixel in an image is not the 81st percentile of bright pixels.
+# We need the top brightest pixels even if they are not as bright as 80% of the brightest pixel.
+# this function is tremendously inefficient right now.
+def get_percentile_brightness(percentile, img):
+    print("max: " + str(img.max()))
+    pixel_count = int(percentile * len(img) * len(img[0]))
+    heap = []
+    for i in range(len(img)):
+        for j in range(len(img[0])):
+            heapq.heappush(heap, img[i,j])
+    return heapq.nsmallest(pixel_count, heap)[pixel_count-1] # Get the dimmest percentile brightest pixel
 
 def find_contours(
     thresh: np.ndarray,
@@ -66,9 +90,8 @@ def find_contours(
 def demo_sample(
     img: np.ndarray,
     z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.81, 0.81, 0.81),
+    threshold_ps: Tuple[float] = (0.99, 0.99, 0.99),
 ) -> None:
-
     # axs is a 2d array like an automatically scaled table.
     fig, axs = plt.subplots(3, 3, figsize=(8, 8))
     channels = [
@@ -77,6 +100,8 @@ def demo_sample(
         "Cilia Base",
     ]
 
+    img_copy = np.copy(img)
+    
     thresh = threshold_image(img, z_slices, threshold_ps)
     contours = find_contours(thresh)
     # Set up subplots for raw image, thresholded image, and then contoured image.
@@ -89,9 +114,10 @@ def demo_sample(
             f"{channel} Channel Thresholded to {threshold_ps[i] * 100}%"
         )
 
+        # 
         cv2.drawContours(img[z_slices[i].z, i], contours[i], -1, (0, 255, 0), 2)
         axs[2][i].imshow(img[z_slices[i].z, i], cmap="gray")
-        axs[2][i].set_title(f"{channel} Channel Contours")
+        axs[2][i].set_title(f"{channel} Contoured")
 
     plt.show()
 
@@ -130,7 +156,7 @@ def find_best_zslices(
 
     if best_only:
         return {
-            c: max(sharpness, key=lambda x: x.sharpness)
+            c: max(sharpness, key=lambda x: 24)
             for c, sharpness in channels.items()
         }
     return channels
@@ -190,20 +216,30 @@ def find_clusters(
 
     return cluster_masks
 
+
+#Display the pixel brightnesses of an image's channel as a histogram
+def show_histogram(img, channel=0):
+    plt.xlabel("Pixel brightness")
+    plt.ylabel("Pixel count")
+    cilia_image = img[24, channel, :, :]
+    max_val = np.max(cilia_image)
+    plt.plot(cv2.calcHist([cilia_image], [0], None, [max_val], [0,max_val]), color="black")
+    plt.show()
+
 def main():
     files = list(DATA_DIR.glob("**/*.tif"))
-    print(len(files))
     for sample in files:
-        print("Showing plot for " + sample.name)
         img = tifffile.imread(sample)
+        
         z_slices = find_best_zslices(img)
+        
         demo_sample(img, z_slices)
-    cluster_masks = find_clusters(img, z_slices)
+        show_histogram(img)
+    # cluster_masks = find_clusters(img, z_slices)
     # plot_image(
     #     np.stack(cluster_masks, axis=0),
     #     title="Cluster Masks",
     # )
-
 
 if __name__ == "__main__":
     main()
