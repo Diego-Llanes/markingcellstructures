@@ -35,24 +35,35 @@ def threshold_image(
     channels: List[str] = ["Cilia", "Golgi", "Cilia Base"],
 ) -> cv2.threshold:
     thresholded = []
-    # img = np.uint8(img)
     for i, channel in enumerate(channels):
-        # thresh = cv2.adaptiveThreshold(
-        #     img[z_slices[i].z, i],
-        #     get_percentile_brightness(threshold_ps[i], img[z_slices[i].z, i]),
-        #     cv2.ADAPTIVE_THRESH_MEAN_C,
-        #     cv2.THRESH_BINARY,
-        #     21, # For different zooms, this will also need to be modified
-        #     -100 # The lower, the relatively brigher a pixel has to be to its surroundings to be included.
-                
-        # )
-        percentile_brightness = get_percentile_brightness(threshold_ps[i], img[z_slices[i].z, i])
-        print(percentile_brightness)
+        image_with_channel = img[z_slices[i].z, i]
+        percentile_brightness = get_percentile_brightness(threshold_ps[i], image_with_channel)
+        max_brightness = image_with_channel.max()
+        
         ret, thresh = cv2.threshold(
-            img[z_slices[i].z, i],
+            image_with_channel,
             percentile_brightness,
-            img[z_slices[i].z, i].max(),
+            max_brightness,
             cv2.THRESH_TOZERO,
+        )
+        
+        # Normalize values. 
+        # Go from percentile_brightness->max to 0->255
+        #Then, do another thresholding to find the REALLY bright spots.
+        thresh = remap_values(
+            thresh,
+            percentile_brightness, max_brightness,
+            0, 255
+        )
+        
+        thresh = np.uint8(thresh)
+        thresh = cv2.adaptiveThreshold(
+            thresh,
+            255,
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY,
+            21, # For different zooms, this will also need to be modified
+            -90 # The lower, the relatively brigher a pixel has to be to its surroundings to be included.
         )
         thresholded.append(thresh)
     return np.stack(thresholded, axis=0)
@@ -61,13 +72,25 @@ def threshold_image(
 # We need the top brightest pixels even if they are not as bright as 80% of the brightest pixel.
 # this function is tremendously inefficient right now.
 def get_percentile_brightness(percentile, img):
-    print("max: " + str(img.max()))
+    # print("max: " + str(img.max()))
     pixel_count = int(percentile * len(img) * len(img[0]))
     heap = []
     for i in range(len(img)):
         for j in range(len(img[0])):
             heapq.heappush(heap, img[i,j])
     return heapq.nsmallest(pixel_count, heap)[pixel_count-1] # Get the dimmest percentile brightest pixel
+
+# Remap values of a 2d array from one range to another
+def remap_values(img, min1, max1, min2, max2):
+    range1 = max1-min1
+    range2 = max2-min2
+    for i in range(len(img)):
+        for j in range(len(img[0])):
+            val = img[i,j]
+            percent = (val-min1)/range1
+            remapped = min2 + (percent*range2)
+            img[i,j] = remapped
+    return img
 
 def find_contours(
     thresh: np.ndarray,
@@ -230,11 +253,11 @@ def main():
     files = list(DATA_DIR.glob("**/*.tif"))
     for sample in files:
         img = tifffile.imread(sample)
-        
+        print("Now looking at " + str(sample))
         z_slices = find_best_zslices(img)
         
         demo_sample(img, z_slices)
-        show_histogram(img)
+        # show_histogram(img)
     # cluster_masks = find_clusters(img, z_slices)
     # plot_image(
     #     np.stack(cluster_masks, axis=0),
