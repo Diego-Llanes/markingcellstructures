@@ -18,13 +18,33 @@ from collections import namedtuple
 # Find the Cilia base and then if there is a Cilia within some delta distance 
 # in the radius of the Cilia base, then we can say that the Cilia is attached to the Cilia base
 
-DATA_DIR = Path(__file__).parent / "data"
+# DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path('/research/jagodzinski/markingcellstructures')
 Sharpness = namedtuple("Sharpness", ["z", "c", "sharpness"])
+Point = namedtuple("Point", ["x", "y",])
 
 """
 notes:
  - data is shaped as (z, c, y, x)
 """
+
+
+def generate_convex_hull(
+        binary_img: np.ndarray,
+) -> List[Point]:
+    """
+    This will take an image and wrap all of the points in convex hull
+    """
+    # Find all of the (x,y) points
+    ...
+    import ipdb; ipdb.set_trace()
+
+
+    # 1. Find the min and max x coords because they are in the convex hull
+    ...
+    # 2. Use the line formed by the two 
+
+
 
 
 def threshold_image(
@@ -188,16 +208,19 @@ def find_clusters(
 
 
 def main():
-    files = list(DATA_DIR.glob("*.tif"))
+    files = list(DATA_DIR.rglob("*.tif"))
     sample = files[0]
     img = tifffile.imread(sample)
     z_slices = find_best_zslices(img)
     demo_sample(img, z_slices)
-    cluster_masks = find_clusters(img, z_slices)
-    # plot_image(
-    #     np.stack(cluster_masks, axis=0),
-    #     title="Cluster Masks",
-    # )
+
+    threshed_image: cv2.threshold = threshold_image(
+        img=img,
+        z_slices=z_slices,
+        threshold_ps=(0.81, 0.81, 0.81),
+        channels=["Cilia", "Golgi", "Cilia Base"],
+    )
+    convex_hull = generate_convex_hull(threshed_image)
 
 
 if __name__ == "__main__":
