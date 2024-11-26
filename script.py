@@ -27,58 +27,71 @@ notes:
  - data is shaped as (z, c, y, x)
 """
 
-# We need a more adaptive thresholding algorithm.
+# Thresholding is the process of separating a foreground and a background from an image, so we're able to create binary images.
+
+# High-level: We want to generate the threshold dynamically per picture. For whatever stupid reason,
+# I'd been setting it manually per attempt and was hoping some combination of local+adaptive thresholding
+# given the manually set threhsold would be sufficient, when it really isn't. This algorithm will likely be novel.
+# We'll need it to work for each different channel, each will likely have different characteristics because they fluoresce differently.
+
+# First (real) attempt: We need some sort of iterative process to determine a threshold of the image.
+# In our meeting we discussed a potential iterative approach. After creating some objective function, we can 
+# strive to maximize this or get somewhere near the peak. This objective function can be made from results of a DBscan, essentially 
+# minimizing the size of the -1 group, maximizing the # of clusters. It's hard to know exactly what was meant.
+# Notes for attempt 1:
+# The slips have a lot of fluorescence which appears the exact same in each slide. Is it reasonable to subtract the fluorescence that appears in all 3 slides?
+# That is, subtract what's common? Cili won't appear where the dots are and where golgi are.
+# The problem with this is that the base brightnesses of everything is not the same. The brightness distributions for each layer are different.
+# 
+# We can't always depend on the cilia being the brightest things in the image. Even if they were, some cilia would be dimmer than others.
+# Can we depend on cilia to be the brightest things within their clusters? Can we do some clustering and then take the brightest blob/lines to be cilia?
+
+# Mainly for the usage of finding percentile brightness values.
+# Try not to use this function more than once for each image, because it's a little costly and the output will be the same.
+# Input is a slice of an image with all of its channels.
+# Output is a list with a sublist for each channel containing pixel brightnesses sorted in descending order.
+def sorted_channel_brightnesses(img):
+    result = []
+    for channel in range(len(img)):
+        total_size = len(img[channel]) * len(img[channel,0])
+        flattened = np.reshape(img[channel], shape=(total_size))
+        result[channel] = sorted(flattened, reverse=True)
+        
+    return result
+
+# From an already-sorted flattened list, return the value for the given percentile.
+# Different from the % of the max value.
+# TODO: We can probably just compute the mean and std. for a more efficient calculation of percentiles.
+def get_percentile_brightness(percentile, list):
+    pixel_count = int(percentile * len(list))
+    return list[pixel_count-1]
+
 def threshold_image(
     img: np.ndarray,
     z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.98, 0.98, 0.98),
+    threshold_ps: Tuple[float] = (0.993, 0.993, 0.993),
     channels: List[str] = ["Cilia", "Golgi", "Cilia Base"],
 ) -> cv2.threshold:
+
     thresholded = []
     for i, channel in enumerate(channels):
-        image_with_channel = img[z_slices[i].z, i]
-        percentile_brightness = get_percentile_brightness(threshold_ps[i], image_with_channel)
-        max_brightness = image_with_channel.max()
+        channel_img = img[z_slices[i].z, i]
         
-        ret, thresh = cv2.threshold(
-            image_with_channel,
-            percentile_brightness,
-            max_brightness,
-            cv2.THRESH_TOZERO,
-        )
+        # We loop through different possible thresholds for passing into DBSCAN, starting at 75.
+        # If cilia aren't in the 75th percentile for brightness, then it's just a bad picture.
+        currentStep = 3
+        for threshold in range(75,100, step=currentStep):
+            print(threshold)
+            percentile_brightness = get_percentile_brightness(threshold_ps[i], channel_img)
         
-        # Normalize values. 
-        # Go from percentile_brightness->max to 0->255
-        #Then, do another thresholding to find the REALLY bright spots.
-        thresh = remap_values(
-            thresh,
-            percentile_brightness, max_brightness,
-            0, 255
-        )
         
-        thresh = np.uint8(thresh)
-        thresh = cv2.adaptiveThreshold(
-            thresh,
-            255,
-            cv2.ADAPTIVE_THRESH_MEAN_C,
-            cv2.THRESH_BINARY,
-            21, # For different zooms, this will also need to be modified
-            -90 # The lower, the relatively brigher a pixel has to be to its surroundings to be included.
-        )
         thresholded.append(thresh)
     return np.stack(thresholded, axis=0)
 
-# 81% of the max brightness pixel in an image is not the 81st percentile of bright pixels.
-# We need the top brightest pixels even if they are not as bright as 80% of the brightest pixel.
-# this function is tremendously inefficient right now.
-def get_percentile_brightness(percentile, img):
-    # print("max: " + str(img.max()))
-    pixel_count = int(percentile * len(img) * len(img[0]))
-    heap = []
-    for i in range(len(img)):
-        for j in range(len(img[0])):
-            heapq.heappush(heap, img[i,j])
-    return heapq.nsmallest(pixel_count, heap)[pixel_count-1] # Get the dimmest percentile brightest pixel
+#Objective function using threshold with DBSCAN that we want to maximize.
+#Returns a score.
+def objective(clusters):
+    print("nothing here yet")
 
 # Remap values of a 2d array from one range to another
 def remap_values(img, min1, max1, min2, max2):
@@ -113,7 +126,7 @@ def find_contours(
 def demo_sample(
     img: np.ndarray,
     z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.99, 0.99, 0.99),
+    threshold_ps: Tuple[float] = (0.993, 0.993, 0.993),
 ) -> None:
     # axs is a 2d array like an automatically scaled table.
     fig, axs = plt.subplots(3, 3, figsize=(8, 8))
@@ -241,12 +254,22 @@ def find_clusters(
 
 
 #Display the pixel brightnesses of an image's channel as a histogram
-def show_histogram(img, channel=0):
+def plot_histogram(img):
+    colors = ["y","c","m"]
     plt.xlabel("Pixel brightness")
     plt.ylabel("Pixel count")
-    cilia_image = img[24, channel, :, :]
-    max_val = np.max(cilia_image)
-    plt.plot(cv2.calcHist([cilia_image], [0], None, [max_val], [0,max_val]), color="black")
+    
+    # cilia_image = img[24, 0, :, :]
+    # max_val = np.max(cilia_image)
+    # plt.plot(cv2.calcHist([cilia_image], [0], None, [max_val], [0,max_val]), color="black")
+    
+    focused_img = img[24]
+    print(np.shape(focused_img))
+    for i in range(len(focused_img)):
+        channel_img = focused_img[i, :, :]
+        max_val = np.max(channel_img)
+        plt.plot(cv2.calcHist([channel_img], [0], None, [max_val], [0,max_val]), color=colors[i]
+        )
     plt.show()
 
 def main():
@@ -256,8 +279,11 @@ def main():
         print("Now looking at " + str(sample))
         z_slices = find_best_zslices(img)
         
-        demo_sample(img, z_slices)
-        # show_histogram(img)
+        # demo_sample(img, z_slices)
+        print("Plotting new histogram")
+        plot_histogram(img)
+        # plt.show()
+    
     # cluster_masks = find_clusters(img, z_slices)
     # plot_image(
     #     np.stack(cluster_masks, axis=0),
