@@ -51,13 +51,13 @@ def threshold_image(
 
 def find_clusters(
     channel_img: np.ndarray,
-    eps=200,
+    eps=100,
 ) -> np.ndarray:
 
     points = np.column_stack(np.where(channel_img > 0))
 
     # find clusters using DBSCAN
-    dbscan = DBSCAN(eps=eps, min_samples=5)
+    dbscan = DBSCAN(eps=eps, min_samples=50)
     labels = dbscan.fit_predict(points)
 
     # mark each cluster

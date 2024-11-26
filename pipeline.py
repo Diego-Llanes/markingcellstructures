@@ -52,7 +52,7 @@ def main():
         axs[channel_idx][1].set_title("threshold")
 
         # move the background and noise to (0, 1)
-        cluster_mask = find_clusters(thresh, 100)
+        cluster_mask = find_clusters(thresh, 50)
         
         # cluster counts
         values = set(cluster_mask.flatten())
