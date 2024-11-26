@@ -52,7 +52,7 @@ def threshold_image(
 def find_clusters(
     channel_img: np.ndarray,
     eps=200,
-) -> List[np.ndarray]:
+) -> np.ndarray:
 
     points = np.column_stack(np.where(channel_img > 0))
 
