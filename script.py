@@ -19,13 +19,76 @@ from collections import namedtuple
 # in the radius of the Cilia base, then we can say that the Cilia is attached to the Cilia base
 
 DATA_DIR = Path(__file__).parent / "data"
+# DATA_DIR = Path('/research/jagodzinski/markingcellstructures')
 Sharpness = namedtuple("Sharpness", ["z", "c", "sharpness"])
+Point = namedtuple("Point", ["x", "y",])
 
 """
 notes:
  - data is shaped as (z, c, y, x)
 """
 
+
+def generate_convex_hull(
+    binary_img: np.ndarray, # cropped image
+) -> List[Point]:
+    """
+    This will take a binary image and wrap all the points in a convex hull.
+    """
+    contours, _ = cv2.findContours(
+        binary_img.astype(np.uint8),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+
+    if not contours:
+        print("No contours found.")
+        return []
+
+    all_points = np.vstack(contours)
+    hull = cv2.convexHull(all_points)
+
+    # Flatten the hull to (n_points, 2)
+    hull = hull[:, 0, :]
+
+    return hull
+
+
+def plot_convex_hull(
+        binary_img: np.ndarray,
+        hull: List[Point],
+        show: bool = True,
+    ) -> None:
+    hull_closed = np.vstack([hull, hull[0]])
+    plt.imshow(binary_img, cmap="gray")
+    plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+    plt.title("Convex Hull")
+    if show:
+        plt.show()
+
+
+def convex_hull_demo(
+        img: np.ndarray,
+) -> None:
+    z_slices = find_best_zslices(img)
+    threshed_image: cv2.threshold = threshold_image(
+        img=img,
+        z_slices=z_slices,
+        threshold_ps=(0.81, 0.81, 0.81),
+        channels=["Cilia", "Golgi", "Cilia Base"],
+    )
+    channel = 0 # Cilia
+    y_start, y_end = 1000, -1
+    x_start, x_end = 600, 800
+
+    convex_hull = generate_convex_hull(threshed_image[channel, y_start:y_end, x_start:x_end])
+
+    # Shift the points to the correct location
+    for point in convex_hull:
+        point[0] += x_start
+        point[1] += y_start
+
+    plot_convex_hull(threshed_image[channel], convex_hull)
 
 def threshold_image(
     img: np.ndarray,
@@ -188,16 +251,11 @@ def find_clusters(
 
 
 def main():
-    files = list(DATA_DIR.glob("*.tif"))
+    files = list(DATA_DIR.rglob("*.tif"))
     sample = files[0]
     img = tifffile.imread(sample)
-    z_slices = find_best_zslices(img)
-    demo_sample(img, z_slices)
-    cluster_masks = find_clusters(img, z_slices)
-    # plot_image(
-    #     np.stack(cluster_masks, axis=0),
-    #     title="Cluster Masks",
-    # )
+    # demo_sample(img, z_slices)
+    convex_hull_demo(img)
 
 
 if __name__ == "__main__":
