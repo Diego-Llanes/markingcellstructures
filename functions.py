@@ -57,7 +57,7 @@ def find_clusters(
     points = np.column_stack(np.where(channel_img > 0))
 
     # find clusters using DBSCAN
-    dbscan = DBSCAN(eps=eps, min_samples=2)
+    dbscan = DBSCAN(eps=eps, min_samples=5)
     labels = dbscan.fit_predict(points)
 
     # mark each cluster

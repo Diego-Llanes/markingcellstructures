@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+import matplotlib.colors as mcolors
+from matplotlib.colors import ListedColormap, BoundaryNorm
 from sklearn.cluster import DBSCAN
 
 from pathlib import Path
@@ -29,8 +31,11 @@ def main():
         "Golgi",
         "Cilia Base",
     ]
-
-    cmap = plt.cm.get_cmap("tab10")
+    
+    custom_colors = ["lightgray", "cyan", "blue", "red", "green", "yellow", "orange", "purple"]
+    cmap = ListedColormap(custom_colors)
+    boundaries = [-2, -1, 0, 1, 2, 3, 4, 5]
+    norm = BoundaryNorm(boundaries, cmap.N)
 
     # find best z_slice (might just be 24 ??)
     zslices= []
@@ -41,27 +46,36 @@ def main():
         zslice = find_best_zslices(channel_img)
         zslices.append(zslice)
 
-        thresh = threshold_image(channel_img[zslice], 0.8)
+        thresh = threshold_image(channel_img[zslice], 0.7)
 
         axs[0].imshow(channel_img[zslice])
         axs[1].imshow(thresh)
         axs[0].set_title("zslice")
         axs[1].set_title("threshold")
+
+        # move the background and noise to (0, 1)
+        cluster_mask = find_clusters(thresh, 100)
         
-        cluster_mask = find_clusters(thresh, 400) + 2 # move the background and noise to positive values
-        num_clusters = int(cluster_mask.max())
+        # cluster counts
+        values = set(cluster_mask.flatten())
+        counts = {-2: 0, -1: 0}
+        for value in values:
+            count = (cluster_mask == value).sum().item()
+            counts[value.item()] = count
 
-        axs[2].imshow(cluster_mask, cmap=cmap)
+        cluster_ids = set(cluster_mask.flatten()) - {-2, -1}
+        num_clusters = len(cluster_ids)
+        
+        cmap = plt.get_cmap('tab10')
+        norm = mcolors.Normalize(vmin=-2, vmax=cluster_mask.max())
+
+        axs[2].imshow(cluster_mask, cmap=cmap, norm=norm)
         axs[2].set_title("clusters")
-        axs[2].set_xlabel(f"num clusters={int(cluster_mask.max() + 1)}")
+        axs[2].set_xlabel(f"num clusters={num_clusters}")
 
-        legend_labels = ["Background", "Noise"] + [f"Cluster {i-2}" for i in range(2, num_clusters)]
-
-        legend_elements = [
-            Patch(color=cmap(i % 10), 
-            label=legend_labels[i]) for i in range(0, num_clusters)
-        ]
-        axs[2].legend(handles=legend_elements, bbox_to_anchor=(1.45, 1.0))
+        legend_colors = [cmap(norm(val)) for val in values]
+        patches = [Patch(color=color, label=f"cluster {val}: {counts[val]}") for val, color in zip(values, legend_colors)]
+        axs[2].legend(handles=patches, bbox_to_anchor=(1.5,1.0))
 
         plt.show()
 
