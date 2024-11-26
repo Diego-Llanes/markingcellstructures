@@ -55,7 +55,7 @@ notes:
 # Input is a slice of an image with all of its channels.
 # Output is a list with a sublist for each channel containing pixel brightnesses sorted in descending order.
 def sorted_channel_brightnesses(img):
-    result = []
+    result = {}
     for channel in range(len(img)):
         total_size = len(img[channel]) * len(img[channel,0])
         flattened = np.reshape(img[channel], shape=(total_size))
@@ -77,10 +77,14 @@ def threshold_image(
     channels: List[str] = ["Cilia", "Golgi", "Cilia Base"],
 ) -> cv2.threshold:
     thresholded = []
+    sorted_brightnesses = sorted_channel_brightnesses(img)
+    
     for i, _ in enumerate(channels):
         image_with_channel = img[i]
-        percentile_brightness = get_percentile_brightness(threshold, image_with_channel)
-        max_brightness = image_with_channel.max()
+        
+        # It's probably more efficient to use the mean and std deviation to calculate percentiles.
+        percentile_brightness = get_percentile_brightness(threshold, sorted_brightnesses[i])
+        max_brightness = sorted_brightnesses[i][0]
         
         _, thresh = cv2.threshold(
             image_with_channel,
@@ -116,7 +120,7 @@ def tune_threshold(
 
         threshold = i / 100
         thresholded_img  = threshold_image(img[z_slices[0].z], threshold)
-        cluster = find_clusters(img[z_slices[0].z], thresholded_img)
+        cluster = find_clusters(img[z_slices[0].z], thresholded_img, z_slices)
         score   = objective(cluster)
         pair = {"score": score, "threshold": threshold}
         
@@ -240,10 +244,10 @@ def find_best_zslices(
 # Returns a cluster mask, where each i,j pair is labeled with its cluster.
 def find_clusters(
     img: np.ndarray,
+    thresh,
     z_slices: Sharpness,
     eps=200,
 ) -> List[np.ndarray]:
-    thresh = threshold_image(img, z_slices)
     contours = find_contours(thresh)
 
     cluster_masks = []
