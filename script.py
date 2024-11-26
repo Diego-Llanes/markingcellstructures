@@ -28,22 +28,33 @@ notes:
  - data is shaped as (z, c, y, x)
 """
 
-
 def generate_convex_hull(
-        binary_img: np.ndarray,
+    binary_img: np.ndarray,
 ) -> List[Point]:
     """
-    This will take an image and wrap all of the points in convex hull
+    This will take a binary image and wrap all the points in a convex hull.
     """
-    # Find all of the (x,y) points
-    ...
-    import ipdb; ipdb.set_trace()
+    contours, _ = cv2.findContours(
+        binary_img.astype(np.uint8),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
 
+    if not contours:
+        print("No contours found.")
+        return []
 
-    # 1. Find the min and max x coords because they are in the convex hull
-    ...
-    # 2. Use the line formed by the two 
+    all_points = np.vstack(contours)
+    hull = cv2.convexHull(all_points)
 
+    plt.imshow(binary_img, cmap="gray")
+    if len(hull) > 0:
+        hull_points = np.vstack(hull)
+        plt.plot(hull_points[:, 0, 0], hull_points[:, 0, 1], "r", linewidth=2)
+    plt.title("Convex Hull")
+    plt.show()
+    
+    return hull
 
 
 
@@ -220,7 +231,7 @@ def main():
         threshold_ps=(0.81, 0.81, 0.81),
         channels=["Cilia", "Golgi", "Cilia Base"],
     )
-    convex_hull = generate_convex_hull(threshed_image)
+    convex_hull = generate_convex_hull(threshed_image[0])
 
 
 if __name__ == "__main__":
