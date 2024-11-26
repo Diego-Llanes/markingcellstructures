@@ -70,6 +70,41 @@ def thresholding_vis(img, channels):
     plt.savefig("deliverables/thresh.png", dpi=200)
 
 
+def plot_convex_hull(
+        binary_img: np.ndarray,
+        hull: List[Point],
+        show: bool = True,
+    ) -> None:
+    hull_closed = np.vstack([hull, hull[0]])
+    plt.imshow(binary_img, cmap="gray")
+    plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+    plt.title("Convex Hull")
+    if show:
+        plt.show()
+
+
+def convex_hull_demo(
+        img: np.ndarray,
+) -> None:
+    z_slices = find_best_zslices(img)
+    threshed_image: cv2.threshold = threshold_image(
+        img=img,
+        z_slices=z_slices,
+        threshold_ps=(0.81, 0.81, 0.81),
+        channels=["Cilia", "Golgi", "Cilia Base"],
+    )
+    channel = 0 # Cilia
+    y_start, y_end = 1000, -1
+    x_start, x_end = 600, 800
+
+    convex_hull = generate_convex_hull(threshed_image[channel, y_start:y_end, x_start:x_end])
+
+    # Shift the points to the correct location
+    for point in convex_hull:
+        point[0] += x_start
+        point[1] += y_start
+
+    plot_convex_hull(threshed_image[channel], convex_hull)
 
 def main():
     files = list(DATA_DIR.rglob("*.tif"))

@@ -69,3 +69,27 @@ def find_clusters(
 
     return cluster_mask
 
+
+def generate_convex_hull(
+    binary_img: np.ndarray, # cropped image
+) -> List[Point]:
+    """
+    This will take a binary image and wrap all the points in a convex hull.
+    """
+    contours, _ = cv2.findContours(
+        binary_img.astype(np.uint8),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+
+    if not contours:
+        print("No contours found.")
+        return []
+
+    all_points = np.vstack(contours)
+    hull = cv2.convexHull(all_points)
+
+    # Flatten the hull to (n_points, 2)
+    hull = hull[:, 0, :]
+
+    return hull
