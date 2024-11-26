@@ -18,8 +18,8 @@ from collections import namedtuple
 # Find the Cilia base and then if there is a Cilia within some delta distance 
 # in the radius of the Cilia base, then we can say that the Cilia is attached to the Cilia base
 
-# DATA_DIR = Path(__file__).parent / "data"
-DATA_DIR = Path('/research/jagodzinski/markingcellstructures')
+DATA_DIR = Path(__file__).parent / "data"
+# DATA_DIR = Path('/research/jagodzinski/markingcellstructures')
 Sharpness = namedtuple("Sharpness", ["z", "c", "sharpness"])
 Point = namedtuple("Point", ["x", "y",])
 
@@ -28,8 +28,9 @@ notes:
  - data is shaped as (z, c, y, x)
 """
 
+
 def generate_convex_hull(
-    binary_img: np.ndarray,
+    binary_img: np.ndarray, # cropped image
 ) -> List[Point]:
     """
     This will take a binary image and wrap all the points in a convex hull.
@@ -47,16 +48,47 @@ def generate_convex_hull(
     all_points = np.vstack(contours)
     hull = cv2.convexHull(all_points)
 
-    plt.imshow(binary_img, cmap="gray")
-    if len(hull) > 0:
-        hull_points = np.vstack(hull)
-        plt.plot(hull_points[:, 0, 0], hull_points[:, 0, 1], "r", linewidth=2)
-    plt.title("Convex Hull")
-    plt.show()
-    
+    # Flatten the hull to (n_points, 2)
+    hull = hull[:, 0, :]
+
     return hull
 
 
+def plot_convex_hull(
+        binary_img: np.ndarray,
+        hull: List[Point],
+        show: bool = True,
+    ) -> None:
+    hull_closed = np.vstack([hull, hull[0]])
+    plt.imshow(binary_img, cmap="gray")
+    plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+    plt.title("Convex Hull")
+    if show:
+        plt.show()
+
+
+def convex_hull_demo(
+        img: np.ndarray,
+) -> None:
+    z_slices = find_best_zslices(img)
+    threshed_image: cv2.threshold = threshold_image(
+        img=img,
+        z_slices=z_slices,
+        threshold_ps=(0.81, 0.81, 0.81),
+        channels=["Cilia", "Golgi", "Cilia Base"],
+    )
+    channel = 0 # Cilia
+    y_start, y_end = 1000, -1
+    x_start, x_end = 600, 800
+
+    convex_hull = generate_convex_hull(threshed_image[channel, y_start:y_end, x_start:x_end])
+
+    # Shift the points to the correct location
+    for point in convex_hull:
+        point[0] += x_start
+        point[1] += y_start
+
+    plot_convex_hull(threshed_image[channel], convex_hull)
 
 def threshold_image(
     img: np.ndarray,
@@ -222,16 +254,8 @@ def main():
     files = list(DATA_DIR.rglob("*.tif"))
     sample = files[0]
     img = tifffile.imread(sample)
-    z_slices = find_best_zslices(img)
-    demo_sample(img, z_slices)
-
-    threshed_image: cv2.threshold = threshold_image(
-        img=img,
-        z_slices=z_slices,
-        threshold_ps=(0.81, 0.81, 0.81),
-        channels=["Cilia", "Golgi", "Cilia Base"],
-    )
-    convex_hull = generate_convex_hull(threshed_image[0])
+    # demo_sample(img, z_slices)
+    convex_hull_demo(img)
 
 
 if __name__ == "__main__":
