@@ -39,7 +39,8 @@ def threshold_image(
     threshold_p: float,
 ) -> cv2.threshold:
     ''' return a binary map threshold image'''
-
+    print(channel_img.max())
+    # breakpoint()
     ret, thresh = cv2.threshold(
         channel_img,
         threshold_p * channel_img.max(),
@@ -47,6 +48,29 @@ def threshold_image(
         cv2.THRESH_BINARY,
     )
     return thresh
+
+# Takes an image and returns the percentile.
+def get_percentile(channel_img, percent):
+    sorted_pixels = sorted(channel_img.flatten(), reverse=True)
+
+def determine_best_threshold(
+    channel_img: np.ndarray,
+    thresh_range: Tuple[float, float],
+    ):
+    scores = []
+    for thresh in range(thresh_range[0], thresh_range[1], 1):
+        thresh /= 100
+        thresholded_img = threshold_image(channel_img, thresh)
+        cluster_mask = find_clusters(thresholded_img)
+        scores.append(objective(cluster_mask))
+    plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
+    plt.show()
+
+def objective(cluster_mask):
+    # FIXME
+    num_clusters = cluster_mask.max() + 1
+    noise_cluster_size = (cluster_mask == -1).sum()
+    return num_clusters - noise_cluster_size
 
 
 def find_clusters(

@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
-from functions import find_best_zslices, threshold_image, find_clusters
+from functions import find_best_zslices, threshold_image, find_clusters, determine_best_threshold
 
-DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
+DATA_DIR = Path("data")
 
 """
 notes:
@@ -23,7 +23,7 @@ notes:
 
 def main():
     files = list(DATA_DIR.rglob("*.tif"))
-    sample = files[0]
+    sample = files[4]
     img = tifffile.imread(sample)
     
     channels = [
@@ -44,7 +44,9 @@ def main():
         channel_img = img[:, channel_idx]
         zslice = find_best_zslices(channel_img)
 
-        thresh = threshold_image(channel_img[zslice], 0.7)
+        best_threshold = determine_best_threshold(channel_img, (65, 80))
+
+        thresh = threshold_image(channel_img[zslice], best_threshold)
 
         axs[channel_idx][0].imshow(channel_img[zslice])
         axs[channel_idx][1].imshow(thresh)
