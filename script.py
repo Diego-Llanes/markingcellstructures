@@ -45,6 +45,10 @@ notes:
 # 
 # We can't always depend on the cilia being the brightest things in the image. Even if they were, some cilia would be dimmer than others.
 # Can we depend on cilia to be the brightest things within their clusters? Can we do some clustering and then take the brightest blob/lines to be cilia?
+# Not so confident in the current proposed method anymore. It's good that we're moving to a more algorithmic way to threshold, but
+# if I'm understanding right, it still boils down to thresholding using some value, though it is determined differently.
+# I feel we need something to do with the brightness to make it work properly.
+
 
 # Mainly for the usage of finding percentile brightness values.
 # Try not to use this function more than once for each image, because it's a little costly and the output will be the same.
@@ -61,35 +65,67 @@ def sorted_channel_brightnesses(img):
 
 # From an already-sorted flattened list, return the value for the given percentile.
 # Different from the % of the max value.
-# TODO: We can probably just compute the mean and std. for a more efficient calculation of percentiles.
+# TODO: We can probably just compute the mean and std dev for a more efficient calculation of percentiles.
 def get_percentile_brightness(percentile, list):
     pixel_count = int(percentile * len(list))
     return list[pixel_count-1]
 
+# Takes a z-slice of an image, then thresholds it based on the given threshold.
 def threshold_image(
     img: np.ndarray,
-    z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.993, 0.993, 0.993),
+    threshold,
     channels: List[str] = ["Cilia", "Golgi", "Cilia Base"],
 ) -> cv2.threshold:
-
     thresholded = []
-    for i, channel in enumerate(channels):
-        channel_img = img[z_slices[i].z, i]
+    for i, _ in enumerate(channels):
+        image_with_channel = img[i]
+        percentile_brightness = get_percentile_brightness(threshold, image_with_channel)
+        max_brightness = image_with_channel.max()
         
-        # We loop through different possible thresholds for passing into DBSCAN, starting at 75.
-        # If cilia aren't in the 75th percentile for brightness, then it's just a bad picture.
-        currentStep = 3
-        for threshold in range(75,100, step=currentStep):
-            print(threshold)
-            percentile_brightness = get_percentile_brightness(threshold_ps[i], channel_img)
+        _, thresh = cv2.threshold(
+            image_with_channel,
+            percentile_brightness,
+            max_brightness,
+            cv2.THRESH_TOZERO,
+        )
         
-        
+        # Normalize values. 
+        # Go from percentile_brightness->max to 0->255
+        #Then, do another thresholding to find the REALLY bright spots.
+        # thresh = remap_values(
+        #     thresh,
+        #     percentile_brightness, max_brightness,
+        #     0, 255
+        # )
+
         thresholded.append(thresh)
+        
     return np.stack(thresholded, axis=0)
 
+# Try many thresholds, score them, then use the best one.
+def tune_threshold(
+    img: np.ndarray,
+) -> None :
+    
+    z_slices = find_best_zslices(img)
+    best = None
+    scores = []
+    
+    # FIXME Tuning for cilia currently. Hard-coded channel 0.
+    for i in range(0, 100, 1):
+
+        threshold = i / 100
+        thresholded_img  = threshold_image(img[z_slices[0].z], threshold)
+        cluster = find_clusters(img[z_slices[0].z], thresholded_img)
+        score   = objective(cluster)
+        pair = {"score": score, "threshold": threshold}
+        
+        if best is None or best[score] < pair[score]:
+            best = {"score": score, "threshold": threshold}
+            
+
 #Objective function using threshold with DBSCAN that we want to maximize.
-#Returns a score.
+#Returns a score, which we use to inform a good enough threshold to use.
 def objective(clusters):
     print("nothing here yet")
 
@@ -105,6 +141,7 @@ def remap_values(img, min1, max1, min2, max2):
             img[i,j] = remapped
     return img
 
+# Take thresholded image and draw a contour around the detected pixels.
 def find_contours(
     thresh: np.ndarray,
 ) -> None:
@@ -126,7 +163,6 @@ def find_contours(
 def demo_sample(
     img: np.ndarray,
     z_slices: Sharpness,
-    threshold_ps: Tuple[float] = (0.993, 0.993, 0.993),
 ) -> None:
     # axs is a 2d array like an automatically scaled table.
     fig, axs = plt.subplots(3, 3, figsize=(8, 8))
@@ -137,8 +173,8 @@ def demo_sample(
     ]
 
     img_copy = np.copy(img)
-    
-    thresh = threshold_image(img, z_slices, threshold_ps)
+    threshold = tune_threshold(img)
+    thresh = threshold_image(img, z_slices, threshold)
     contours = find_contours(thresh)
     # Set up subplots for raw image, thresholded image, and then contoured image.
     for i, channel in enumerate(channels):
@@ -147,17 +183,16 @@ def demo_sample(
 
         axs[1][i].imshow(thresh[i], cmap="gray")
         axs[1][i].set_title(
-            f"{channel} Channel Thresholded to {threshold_ps[i] * 100}%"
+            f"{channel} Channel Thresholded to {threshold * 100}%"
         )
 
-        # 
         cv2.drawContours(img[z_slices[i].z, i], contours[i], -1, (0, 255, 0), 2)
         axs[2][i].imshow(img[z_slices[i].z, i], cmap="gray")
         axs[2][i].set_title(f"{channel} Contoured")
 
     plt.show()
 
-
+# Not used as far as I know. 
 def plot_image(img: np.ndarray, title: str = "Image", show=True) -> None:
     if len(img.shape) > 2:
         fig, axs = plt.subplots(1, img.shape[0], figsize=(8, 8))
@@ -171,7 +206,10 @@ def plot_image(img: np.ndarray, title: str = "Image", show=True) -> None:
     if show:
         plt.show()
 
-
+# Given an image with all slices,
+# return a dictionary where each int key representing a z layer is paired with its sharpness data.
+# Note: There may not be 1 *best* layer. Cilia for example sometimes are sharpest
+# on different layers, such that you can't find one single layer where you can see them all.
 def find_best_zslices(
     img: np.ndarray,
     best_only=True,
@@ -197,7 +235,9 @@ def find_best_zslices(
         }
     return channels
 
-
+# Use DBSCAN to generate cluster data for each pixel in the supplied image.
+# Takes an image, best slices, and an epsilon.
+# Returns a cluster mask, where each i,j pair is labeled with its cluster.
 def find_clusters(
     img: np.ndarray,
     z_slices: Sharpness,
@@ -253,15 +293,11 @@ def find_clusters(
     return cluster_masks
 
 
-#Display the pixel brightnesses of an image's channel as a histogram
+#Display the pixel brightnesses of an image's channels as a histogram
 def plot_histogram(img):
     colors = ["y","c","m"]
     plt.xlabel("Pixel brightness")
     plt.ylabel("Pixel count")
-    
-    # cilia_image = img[24, 0, :, :]
-    # max_val = np.max(cilia_image)
-    # plt.plot(cv2.calcHist([cilia_image], [0], None, [max_val], [0,max_val]), color="black")
     
     focused_img = img[24]
     print(np.shape(focused_img))
@@ -279,9 +315,9 @@ def main():
         print("Now looking at " + str(sample))
         z_slices = find_best_zslices(img)
         
-        # demo_sample(img, z_slices)
+        demo_sample(img, z_slices)
         print("Plotting new histogram")
-        plot_histogram(img)
+        # plot_histogram(img)
         # plt.show()
     
     # cluster_masks = find_clusters(img, z_slices)
