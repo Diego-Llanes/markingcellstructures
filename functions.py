@@ -39,35 +39,44 @@ def threshold_image(
     threshold_p: float,
 ) -> cv2.threshold:
     ''' return a binary map threshold image'''
-    print(channel_img.max())
-    # breakpoint()
+    percentile_brightness = get_percentile(channel_img, threshold_p)
     ret, thresh = cv2.threshold(
         channel_img,
-        threshold_p * channel_img.max(),
+        percentile_brightness,
         channel_img.max(),
         cv2.THRESH_BINARY,
     )
     return thresh
 
-# Takes an image and returns the percentile.
-def get_percentile(channel_img, percent):
-    sorted_pixels = sorted(channel_img.flatten(), reverse=True)
+# Takes an image and returns the brightness of a certain percentile.
+# Higher percentile, brighter pixel.
+# Basically the same as using the standard deviation and mean.
+def get_percentile(channel_img, percentile):
+    flattened = np.array(channel_img).flatten()
+    sorted_pixels = sorted(flattened, reverse=True)
+    pixel_amt = int(len(flattened) * (1-percentile)) # Amount of pixels within the supplied percentile
+    return sorted_pixels[pixel_amt-1]
 
 def determine_best_threshold(
     channel_img: np.ndarray,
     thresh_range: Tuple[float, float],
     ):
     scores = []
-    for thresh in range(thresh_range[0], thresh_range[1], 1):
-        thresh /= 100
-        thresholded_img = threshold_image(channel_img, thresh)
+    for percentile in range(thresh_range[0], thresh_range[1], 1):
+        percentile /= 100
+        print("Testing threshold " + str(percentile))
+        thresholded_img = threshold_image(channel_img, percentile)
         cluster_mask = find_clusters(thresholded_img)
         scores.append(objective(cluster_mask))
+    
+    print("showing plot...")
+    print(scores)
     plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
     plt.show()
 
 def objective(cluster_mask):
     # FIXME
+    breakpoint()
     num_clusters = cluster_mask.max() + 1
     noise_cluster_size = (cluster_mask == -1).sum()
     return num_clusters - noise_cluster_size
@@ -93,3 +102,5 @@ def find_clusters(
 
     return cluster_mask
 
+if __name__ == "__main__":
+    print("Running wrong file!")
