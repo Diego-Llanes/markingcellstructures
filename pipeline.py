@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
-from functions import find_best_zslices, threshold_image, find_clusters
+from functions import find_best_z_slices, threshold_image, find_clusters
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
 
@@ -42,7 +42,7 @@ def main():
     for channel_idx, channel in enumerate(channels):
 
         channel_img = img[:, channel_idx]
-        zslice = find_best_zslices(channel_img)
+        zslice = find_best_z_slices(channel_img)
 
         thresh = threshold_image(channel_img[zslice], 0.7)
 

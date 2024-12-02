@@ -2,7 +2,7 @@ import tifffile
 from pathlib import Path
 
 from functions import (
-    find_best_zslices,
+    find_best_z_slices,
     threshold_image,
     get_convex_hull_for_each_cluster,
     find_clusters,
@@ -27,7 +27,7 @@ def test_find_COM_for_each_cluster():
     img = img[:, CHANNEL_TO_VIEW]
 
     # find best zslice and threshold it to above 70%
-    best_zslice = find_best_zslices(img)
+    best_zslice = find_best_z_slices(img)
     img = img[best_zslice]
     binary_img = threshold_image(img, PERCENTAGE_THRESHOLD)
 
@@ -62,7 +62,7 @@ def test_find_convex_hull_per_cluster():
     img = img[:, CHANNEL_TO_VIEW]
 
     # find best zslice and threshold it to above 70%
-    best_zslice = find_best_zslices(img)
+    best_zslice = find_best_z_slices(img)
     binary_img = threshold_image(img[best_zslice], PERCENTAGE_THRESHOLD)
 
     # find clusters
