@@ -119,6 +119,23 @@ def get_convex_hull_for_each_cluster(
     return cluster_hulls
 
 
+def find_COM_for_each_cluster(
+    img: np.ndarray,
+    cluster_hulls: Dict[int, List[Point]],
+) -> Dict[int, Point]:
+    """
+    Find the center of mass for each cluster
+    """
+    cluster_COMs = {}
+    for cluster_id, hull in cluster_hulls.items():
+        # get the center of mass for the hull
+        hull = np.array(hull)
+        center_of_mass = np.mean(hull, axis=0)
+        cluster_COMs[cluster_id] = Point(center_of_mass[0], center_of_mass[1])
+
+    return cluster_COMs
+
+
 def generate_convex_hull(
     binary_img: np.ndarray, # cropped image
 ) -> List[Point]:

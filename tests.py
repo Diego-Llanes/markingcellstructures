@@ -13,14 +13,14 @@ def test_find_convex_hull_per_cluster():
     from visualizations import plot_convex_hull
 
     img = tifffile.imread(Path("data/_1_MMStack_Pos0.ome.tif"))
-    cillia_channel = 0
-    img = img[:, cillia_channel]
+    channel_to_view = 2
+    img = img[:, channel_to_view]
 
     # find best zslice and threshold it to above 70%
     best_zslice = find_best_zslices(img)
     binary_img = threshold_image(
         img[best_zslice],
-        0.7
+        0.5
     )
 
     # find clusters
