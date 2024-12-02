@@ -84,18 +84,11 @@ def find_clusters(
 
 def get_convex_hull_for_each_cluster(
         binary_img: np.ndarray,
-        eps=100,
-        min_samples_per_cluster=50,
+        clusters: np.ndarray,
 ) -> Dict[int, List[Point]]:
     """
     take in a binary image and return a dictionary of cluster_id to convex hull
     """
-
-    clusters = find_clusters(
-        binary_img,
-        eps=eps,
-        min_samples=min_samples_per_cluster,
-    )
 
     # get all unique cluster ids
     cluster_ids_and_noise = np.unique(clusters)
