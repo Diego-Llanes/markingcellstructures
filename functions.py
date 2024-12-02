@@ -9,7 +9,7 @@ from typing import List, Tuple, Dict
 
 from collections import namedtuple
 
-Point = namedtuple('Point', ['x', 'y'])
+Point = namedtuple('Point', ['x', 'y']) # only used for type hinting
 
 
 def find_best_zslices(
@@ -131,7 +131,7 @@ def find_COM_for_each_cluster(
         # get the center of mass for the hull
         hull = np.array(hull)
         center_of_mass = np.mean(hull, axis=0)
-        cluster_COMs[cluster_id] = Point(center_of_mass[0], center_of_mass[1])
+        cluster_COMs[cluster_id] = np.array(center_of_mass, dtype=int)
 
     return cluster_COMs
 

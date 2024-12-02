@@ -8,37 +8,64 @@ from functions import (
     find_clusters,
 )
 
-def test_find_convex_hull_per_cluster():
-    print("WARNING: debugging, don't run this file otherwise.")
-    from visualizations import plot_convex_hull
+from visualizations import plot_convex_hull
 
-    img = tifffile.imread(Path("data/_1_MMStack_Pos0.ome.tif"))
-    channel_to_view = 2
-    img = img[:, channel_to_view]
+
+TIF_FILE = Path("data/_1_MMStack_Pos0.ome.tif")
+CHANNEL_TO_VIEW = 2
+PERCENTAGE_THRESHOLD = 0.5
+EPS = 100
+MIN_SAMPLES = 2
+
+
+def test_find_COM_for_each_cluster():
+    img = tifffile.imread(TIF_FILE)
+    img = img[:, CHANNEL_TO_VIEW]
 
     # find best zslice and threshold it to above 70%
     best_zslice = find_best_zslices(img)
-    binary_img = threshold_image(
-        img[best_zslice],
-        0.5
-    )
+    binary_img = threshold_image(img[best_zslice], PERCENTAGE_THRESHOLD)
 
     # find clusters
     clusters = find_clusters(
         binary_img,
-        eps=100,
-        min_samples=2, # cillia can be small
+        eps=EPS,
+        min_samples=MIN_SAMPLES,
     )
 
     convex_hulls = get_convex_hull_for_each_cluster(
         binary_img,
         clusters,
     )
+
+
+def test_find_convex_hull_per_cluster():
+
+    img = tifffile.imread(TIF_FILE)
+    img = img[:, CHANNEL_TO_VIEW]
+
+    # find best zslice and threshold it to above 70%
+    best_zslice = find_best_zslices(img)
+    binary_img = threshold_image(img[best_zslice], PERCENTAGE_THRESHOLD)
+
+    # find clusters
+    clusters = find_clusters(
+        binary_img,
+        eps=EPS,
+        min_samples=MIN_SAMPLES,
+    )
+
+    convex_hulls = get_convex_hull_for_each_cluster(
+        binary_img,
+        clusters,
+    )
+
     for cluster_id, hull in convex_hulls.items():
-        plot_convex_hull(
-            binary_img,
-            hull
-        )
+        plot_convex_hull(binary_img, hull)
+
+    return convex_hulls
+
 
 if __name__ == "__main__":
+    print("WARNING: debugging, don't run this file otherwise.")
     test_find_convex_hull_per_cluster()
