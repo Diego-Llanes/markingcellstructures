@@ -56,8 +56,8 @@ def threshold_image(
 def find_clusters(
     channel_img: np.ndarray,
     eps=100,
+    min_samples=50,
 ) -> np.ndarray:
-    import ipdb; ipdb.set_trace()
 
     points = np.column_stack(
         np.where(
@@ -66,7 +66,10 @@ def find_clusters(
     )
 
     # find clusters using DBSCAN
-    dbscan = DBSCAN(eps=eps, min_samples=2)
+    dbscan = DBSCAN(
+        eps=eps,
+        min_samples=min_samples,
+    )
     labels = dbscan.fit_predict(points)
 
     # mark each cluster
@@ -82,6 +85,7 @@ def find_clusters(
 def get_convex_hull_for_each_cluster(
         binary_img: np.ndarray,
         eps=100,
+        min_samples_per_cluster=50,
 ) -> Dict[int, List[Point]]:
     """
     take in a binary image and return a dictionary of cluster_id to convex hull
@@ -90,6 +94,7 @@ def get_convex_hull_for_each_cluster(
     clusters = find_clusters(
         binary_img,
         eps=eps,
+        min_samples=min_samples_per_cluster,
     )
 
     # get all unique cluster ids
@@ -98,19 +103,27 @@ def get_convex_hull_for_each_cluster(
     # remove the noise cluster (-1)
     cluster_ids = cluster_ids_and_noise[cluster_ids_and_noise != -1]
 
+    # remove the background cluster (-2)
+    cluster_ids = cluster_ids[cluster_ids != -2]
+
     cluster_hulls = {}
     for cluster_id in cluster_ids:
         # find the min and max points for the cluster_ids
         max_x, max_y = np.max(np.where(clusters == cluster_id), axis=1)
         min_x, min_y = np.min(np.where(clusters == cluster_id), axis=1)
 
-        # crop the image to the cluster 
+        # crop the image to the cluster
         cropped_img = binary_img[min_x:max_x, min_y:max_y]
 
         # get the convex hull for the cropped image
         hull = generate_convex_hull(cropped_img)
+
+        # shift the hull back to the original image
+        hull = [np.array([point[0] + min_y, point[1] + min_x]) for point in hull]
+
         cluster_hulls[cluster_id] = hull
-        import ipdb; ipdb.set_trace()
+
+    return cluster_hulls
 
 
 def generate_convex_hull(
@@ -139,21 +152,4 @@ def generate_convex_hull(
 
 
 if __name__ == "__main__":
-    print("WARNING: debugging, don't run this file otherwise.")
-    from visualizations import plot_convex_hull
-
-    img = tifffile.imread(Path("data/_1_MMStack_Pos0.ome.tif"))
-    cillia_channel = 0
-    img = img[:, cillia_channel]
-
-    best_zslice = find_best_zslices(img)
-    binary_img = threshold_image(
-        img[best_zslice],
-        0.7
-    )
-
-    convex_hulls = get_convex_hull_for_each_cluster(binary_img)
-    for cluster_id, hull in convex_hulls.items():
-        plot_convex_hull(binary_img, hull)
-
-
+    ...
