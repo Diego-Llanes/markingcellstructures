@@ -41,9 +41,12 @@ def threshold_image(
 ) -> cv2.threshold:
     ''' return a binary map threshold image'''
 
+    # min max normalize the image
+    channel_img = (channel_img - channel_img.min()) / (channel_img.max() - channel_img.min())
+
     ret, thresh = cv2.threshold(
         channel_img,
-        threshold_p * channel_img.max(),
+        threshold_p,
         channel_img.max(),
         cv2.THRESH_BINARY,
     )
@@ -54,11 +57,16 @@ def find_clusters(
     channel_img: np.ndarray,
     eps=100,
 ) -> np.ndarray:
+    import ipdb; ipdb.set_trace()
 
-    points = np.column_stack(np.where(channel_img > 0))
+    points = np.column_stack(
+        np.where(
+            channel_img > 0
+        )
+    )
 
     # find clusters using DBSCAN
-    dbscan = DBSCAN(eps=eps, min_samples=50)
+    dbscan = DBSCAN(eps=eps, min_samples=2)
     labels = dbscan.fit_predict(points)
 
     # mark each cluster
@@ -73,12 +81,16 @@ def find_clusters(
 
 def get_convex_hull_for_each_cluster(
         binary_img: np.ndarray,
+        eps=100,
 ) -> Dict[int, List[Point]]:
     """
     take in a binary image and return a dictionary of cluster_id to convex hull
     """
 
-    clusters = find_clusters(binary_img)
+    clusters = find_clusters(
+        binary_img,
+        eps=eps,
+    )
 
     # get all unique cluster ids
     cluster_ids_and_noise = np.unique(clusters)
@@ -135,10 +147,13 @@ if __name__ == "__main__":
     img = img[:, cillia_channel]
 
     best_zslice = find_best_zslices(img)
-    binary_img = threshold_image(img[best_zslice], 0.1)
+    binary_img = threshold_image(
+        img[best_zslice],
+        0.7
+    )
 
     convex_hulls = get_convex_hull_for_each_cluster(binary_img)
-    # for cluster_id, hull in convex_hulls.items():
-    #     plot_convex_hull(binary_img, hull)
+    for cluster_id, hull in convex_hulls.items():
+        plot_convex_hull(binary_img, hull)
 
 
