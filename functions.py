@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
+import math
 
 from pathlib import Path
 from typing import List, Tuple, Dict
@@ -53,12 +54,19 @@ def threshold_image(
 # Higher percentile, brighter pixel.
 # Basically the same as using the standard deviation and mean.
 def get_percentile(channel_img, percentile):
+    assert percentile >= 0
+    assert percentile <= 1
+    
     flattened = np.array(channel_img).flatten()
     sorted_pixels = sorted(flattened, reverse=True)
-    pixel_amt = int(len(flattened) * (1-percentile)) # Amount of pixels within the supplied percentile
+    pixel_amt = math.ceil(len(flattened) * (1-percentile)) # Amount of pixels within the supplied percentile.
     return sorted_pixels[pixel_amt-1]
 
-def determine_best_threshold(
+# Parameters determined:
+#   Global thresholding: Threshold percentile
+#   DBSCAN: Epsilon and min_samples
+# Done by computing each combination and using best results of objective function.
+def determine_best_parameters(
     channel_img: np.ndarray,
     thresh_range: Tuple[float, float],
     ):
@@ -69,10 +77,18 @@ def determine_best_threshold(
         thresholded_img = threshold_image(channel_img, percentile)
         cluster_mask = find_clusters(thresholded_img)
         _debug_show_clusters(cluster_mask)
+        
         scores.append(objective(cluster_mask))
     print(scores)
+    # Will be for looking at results of objective function.
     plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
     plt.show()
+
+#
+def process_clusters(channel_img, cluster_mask):
+    cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
+    for cluster in cluster_ids:
+        print("Normalize each cluster and do stuff")
 
 # DEBUG. Visualize computed clusters.
 def _debug_show_clusters(cluster_mask):
@@ -85,9 +101,6 @@ def _debug_show_clusters(cluster_mask):
     for value in values:
         count = (cluster_mask == value).sum().item()
         counts[value.item()] = count
-
-    cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
-    num_clusters = len(cluster_ids)
     
     # Set up visualization
     cmap = plt.get_cmap('tab20')
