@@ -128,10 +128,24 @@ def find_COM_for_each_cluster(
     """
     cluster_COMs = {}
     for cluster_id, hull in cluster_hulls.items():
-        # get the center of mass for the hull
         hull = np.array(hull)
-        center_of_mass = np.mean(hull, axis=0)
-        cluster_COMs[cluster_id] = np.array(center_of_mass, dtype=int)
+
+        # find all points that fall within the hull
+        mask = np.zeros_like(img, dtype=np.uint8)
+        cv2.fillPoly(mask, [hull], 1)
+        mask = mask.astype(bool)
+
+        # create a meshgrid of x and y indices
+        y_indices, x_indices = np.meshgrid(
+            np.arange(img.shape[0]), np.arange(img.shape[1]), indexing='ij'
+        )
+
+        # calculate the center of mass
+        total_mass = np.sum(mask * img)
+        com_x = np.sum(x_indices * mask * img) / total_mass
+        com_y = np.sum(y_indices * mask * img) / total_mass
+
+        cluster_COMs[cluster_id] = np.array([com_x, com_y])
 
     return cluster_COMs
 

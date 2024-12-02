@@ -81,15 +81,33 @@ def plot_convex_hull(
 
 
 def plot_hulls_of_clusters(
-    binary_img: np.ndarray,
+    img: np.ndarray,
     hulls: Dict[int, List[Point]],
     show: bool = True,
 ) -> None:
-    plt.imshow(binary_img, cmap="gray")
+    plt.imshow(img, cmap="gray")
     for cluster, hull in hulls.items():
         hull_closed = np.vstack([hull, hull[0]])
         plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
     plt.title("Convex Hulls of Clusters")
+    if show:
+        plt.show()
+
+
+def plot_COMs_of_clusters(
+    img: np.ndarray,
+    hulls: Dict[int, List[Point]],
+    COMs: Dict[int, Point],
+    show: bool = True,
+) -> None:
+    plt.imshow(img, cmap="gray")
+    for cluster, hull in hulls.items():
+        hull_closed = np.vstack([hull, hull[0]])
+        plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+
+    for cluster, COM in COMs.items():
+        plt.scatter(COM[0], COM[1], c="b", s=50)
+    plt.title("Centers of Mass of Clusters")
     if show:
         plt.show()
 
