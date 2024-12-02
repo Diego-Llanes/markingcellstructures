@@ -9,6 +9,7 @@ from typing import List, Tuple, Dict
 
 from collections import namedtuple
 
+Point = namedtuple('Point', ['x', 'y'])
 
 
 def find_best_zslices(
@@ -19,7 +20,7 @@ def find_best_zslices(
     '''for a channel image [51, 1200, 1200] return the index of the best zslice'''
 
     z_slices = img.shape[0]
-    
+
     best_sharpness = 0
     best_zslice_idx = 0
 
@@ -30,7 +31,7 @@ def find_best_zslices(
         if sharpness > best_sharpness:
             best_sharpness = sharpness
             best_zslice_idx = i
-    
+
     return best_zslice_idx
 
 
@@ -40,9 +41,12 @@ def threshold_image(
 ) -> cv2.threshold:
     ''' return a binary map threshold image'''
 
+    # min max normalize the image
+    channel_img = (channel_img - channel_img.min()) / (channel_img.max() - channel_img.min())
+
     ret, thresh = cv2.threshold(
         channel_img,
-        threshold_p * channel_img.max(),
+        threshold_p,
         channel_img.max(),
         cv2.THRESH_BINARY,
     )
@@ -52,12 +56,20 @@ def threshold_image(
 def find_clusters(
     channel_img: np.ndarray,
     eps=100,
+    min_samples=50,
 ) -> np.ndarray:
 
-    points = np.column_stack(np.where(channel_img > 0))
+    points = np.column_stack(
+        np.where(
+            channel_img > 0
+        )
+    )
 
     # find clusters using DBSCAN
-    dbscan = DBSCAN(eps=eps, min_samples=50)
+    dbscan = DBSCAN(
+        eps=eps,
+        min_samples=min_samples,
+    )
     labels = dbscan.fit_predict(points)
 
     # mark each cluster
@@ -68,6 +80,43 @@ def find_clusters(
         cluster_mask[coord[0], coord[1]] = label
 
     return cluster_mask
+
+
+def get_convex_hull_for_each_cluster(
+        binary_img: np.ndarray,
+        clusters: np.ndarray,
+) -> Dict[int, List[Point]]:
+    """
+    take in a binary image and return a dictionary of cluster_id to convex hull
+    """
+
+    # get all unique cluster ids
+    cluster_ids_and_noise = np.unique(clusters)
+
+    # remove the noise cluster (-1)
+    cluster_ids = cluster_ids_and_noise[cluster_ids_and_noise != -1]
+
+    # remove the background cluster (-2)
+    cluster_ids = cluster_ids[cluster_ids != -2]
+
+    cluster_hulls = {}
+    for cluster_id in cluster_ids:
+        # find the min and max points for the cluster_ids
+        max_x, max_y = np.max(np.where(clusters == cluster_id), axis=1)
+        min_x, min_y = np.min(np.where(clusters == cluster_id), axis=1)
+
+        # crop the image to the cluster
+        cropped_img = binary_img[min_x:max_x, min_y:max_y]
+
+        # get the convex hull for the cropped image
+        hull = generate_convex_hull(cropped_img)
+
+        # shift the hull back to the original image
+        hull = [np.array([point[0] + min_y, point[1] + min_x]) for point in hull]
+
+        cluster_hulls[cluster_id] = hull
+
+    return cluster_hulls
 
 
 def generate_convex_hull(
@@ -93,3 +142,7 @@ def generate_convex_hull(
     hull = hull[:, 0, :]
 
     return hull
+
+
+if __name__ == "__main__":
+    ...
