@@ -9,6 +9,7 @@ from typing import List, Tuple, Dict
 
 from collections import namedtuple
 
+Point = namedtuple('Point', ['x', 'y'])
 
 
 def find_best_zslices(
@@ -19,7 +20,7 @@ def find_best_zslices(
     '''for a channel image [51, 1200, 1200] return the index of the best zslice'''
 
     z_slices = img.shape[0]
-    
+
     best_sharpness = 0
     best_zslice_idx = 0
 
@@ -30,7 +31,7 @@ def find_best_zslices(
         if sharpness > best_sharpness:
             best_sharpness = sharpness
             best_zslice_idx = i
-    
+
     return best_zslice_idx
 
 
@@ -70,6 +71,36 @@ def find_clusters(
     return cluster_mask
 
 
+def get_convex_hull_for_each_cluster(
+        binary_img: np.ndarray,
+) -> Dict[int, List[Point]]:
+    """
+    take in a binary image and return a dictionary of cluster_id to convex hull
+    """
+
+    clusters = find_clusters(binary_img)
+
+    # get all unique cluster ids
+    cluster_ids_and_noise = np.unique(clusters)
+
+    # remove the noise cluster (-1)
+    cluster_ids = cluster_ids_and_noise[cluster_ids_and_noise != -1]
+
+    cluster_hulls = {}
+    for cluster_id in cluster_ids:
+        # find the min and max points for the cluster_ids
+        max_x, max_y = np.max(np.where(clusters == cluster_id), axis=1)
+        min_x, min_y = np.min(np.where(clusters == cluster_id), axis=1)
+
+        # crop the image to the cluster 
+        cropped_img = binary_img[min_x:max_x, min_y:max_y]
+
+        # get the convex hull for the cropped image
+        hull = generate_convex_hull(cropped_img)
+        cluster_hulls[cluster_id] = hull
+        import ipdb; ipdb.set_trace()
+
+
 def generate_convex_hull(
     binary_img: np.ndarray, # cropped image
 ) -> List[Point]:
@@ -93,3 +124,21 @@ def generate_convex_hull(
     hull = hull[:, 0, :]
 
     return hull
+
+
+if __name__ == "__main__":
+    print("WARNING: debugging, don't run this file otherwise.")
+    from visualizations import plot_convex_hull
+
+    img = tifffile.imread(Path("data/_1_MMStack_Pos0.ome.tif"))
+    cillia_channel = 0
+    img = img[:, cillia_channel]
+
+    best_zslice = find_best_zslices(img)
+    binary_img = threshold_image(img[best_zslice], 0.1)
+
+    convex_hulls = get_convex_hull_for_each_cluster(binary_img)
+    # for cluster_id, hull in convex_hulls.items():
+    #     plot_convex_hull(binary_img, hull)
+
+

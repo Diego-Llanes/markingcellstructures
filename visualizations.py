@@ -72,7 +72,7 @@ def thresholding_vis(img, channels):
 
 def plot_convex_hull(
         binary_img: np.ndarray,
-        hull: List[Point],
+        hull,
         show: bool = True,
     ) -> None:
     hull_closed = np.vstack([hull, hull[0]])
