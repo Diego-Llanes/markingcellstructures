@@ -45,14 +45,22 @@ notes:
 # broadly cluster the regions so we can operate on each independently.
 #   2. DBSCAN the remaining image. This will produce our cluster mask.
 # Now we have our independent clusters. Each cluster will be narrowed down to a cilia (or multiple?) later.
-#   3. For each cluster, we want to normalize the values to a decent range.
+#   3. For each cluster, we want to normalize the values to a decent range, ignoring noise and background.
 #   4. Now with our normalized cluster, we will run blob detection. We should filter by circularity and color.
 # All detected blobs are assumed to be cilia with a relatively high degree of confidence.
 # It's very likely that non-cilia are detected, but these will be filtered out when we don't find one of the other necessary cell structures nearby.
 
-# Progress: 1 - done
-# 2 - DBSCAN is eating all my memory. Don't know why.
+# Progress:
+# 1 - done
+# 2 - We should maximize an objective function while changing the parameters listed below. 
+#   Changing these parameters affects how groups form which could be significant.
+#   - done
+# 3 - 
 
+#Thing we might want to loop over for objective function:
+#   - Epsilon/min samples for DBSCAN.
+#       - Different preset ranges for each channel.
+#   - 1st step global thresholding percentile value
 
 # Third proposed approach: Will just blob detection do the trick here???
 # We could run our looping objective function on the parameters of this, and define an objective function for each cilia, golgi, and dots.
@@ -76,50 +84,16 @@ def main():
     norm = BoundaryNorm(boundaries, cmap.N)
 
     # find best z_slice (might just be 24 ??)
-    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(15, 15))
+    # fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(15, 15))
     for channel_idx, channel in enumerate(channels):
 
         channel_img = img[:, channel_idx]
-        zslice = 27# find_best_zslices(channel_img)
+        zslice = 27 # find_best_zslices(channel_img)
         best_slice = channel_img[zslice]
         
-        # best_threshold = determine_best_threshold(best_slice, (95, 98))
-        # print("Threshold: " + str(best_threshold))
+        best_threshold = determine_best_threshold(best_slice, (95, 97))
+        print("Threshold: " + str(best_threshold))
         thresh = threshold_image(channel_img[zslice], 0.9)
-
-        axs[channel_idx][0].imshow(channel_img[zslice])
-        axs[channel_idx][1].imshow(thresh)
-        axs[channel_idx][0].set_title("zslice")
-        axs[channel_idx][1].set_title("threshold")
-
-        # move the background and noise to (0, 1)
-        cluster_mask = find_clusters(thresh, 100)
-        
-        # cluster counts
-        values = set(cluster_mask.flatten())
-        counts = {-2: 0, -1: 0}
-        for value in values:
-            count = (cluster_mask == value).sum().item()
-            counts[value.item()] = count
-
-        cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
-        num_clusters = len(cluster_ids)
-        
-        cmap = plt.get_cmap('tab10')
-        norm = mcolors.Normalize(vmin=-2, vmax=cluster_mask.max())
-
-        axs[channel_idx][2].imshow(cluster_mask, cmap=cmap, norm=norm)
-        axs[channel_idx][2].set_title("clusters")
-        axs[channel_idx][2].set_xlabel(f"num clusters={num_clusters}")
-
-        legend_colors = [cmap(norm(val)) for val in values]
-        patches = [Patch(color=color, label=f"cluster {val}: {counts[val]}") for val, color in zip(values, legend_colors)]
-        axs[channel_idx][2].legend(handles=patches, bbox_to_anchor=(1.85,1.0))
-
-        axs[channel_idx][0].set_ylabel(channel)
-
-    fig.suptitle(sample.name.split(".")[0])
-    plt.show()
 
 
 if __name__ == "__main__":
