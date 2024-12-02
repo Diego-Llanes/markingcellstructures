@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from pathlib import Path
+from typing import List, Dict
 
-from functions import find_best_zslices, threshold_image
+from functions import find_best_zslices, threshold_image, generate_convex_hull, Point
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
 
@@ -68,13 +69,27 @@ def thresholding_vis(img, channels):
 
 def plot_convex_hull(
     binary_img: np.ndarray,
-    hull,
+    hull: List[Point],
     show: bool = True,
 ) -> None:
     hull_closed = np.vstack([hull, hull[0]])
     plt.imshow(binary_img, cmap="gray")
     plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
     plt.title("Convex Hull")
+    if show:
+        plt.show()
+
+
+def plot_hulls_of_clusters(
+    binary_img: np.ndarray,
+    hulls: Dict[int, List[Point]],
+    show: bool = True,
+) -> None:
+    plt.imshow(binary_img, cmap="gray")
+    for cluster, hull in hulls.items():
+        hull_closed = np.vstack([hull, hull[0]])
+        plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+    plt.title("Convex Hulls of Clusters")
     if show:
         plt.show()
 

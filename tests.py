@@ -8,7 +8,7 @@ from functions import (
     find_clusters,
 )
 
-from visualizations import plot_convex_hull
+from visualizations import plot_convex_hull, plot_hulls_of_clusters
 
 
 TIF_FILE = Path("data/_1_MMStack_Pos0.ome.tif")
@@ -60,8 +60,10 @@ def test_find_convex_hull_per_cluster():
         clusters,
     )
 
-    for cluster_id, hull in convex_hulls.items():
-        plot_convex_hull(binary_img, hull)
+    # for cluster_id, hull in convex_hulls.items():
+    #     plot_convex_hull(binary_img, hull)
+
+    plot_hulls_of_clusters(binary_img, convex_hulls)
 
     return convex_hulls
 
