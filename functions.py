@@ -154,18 +154,11 @@ def get_convex_hull_for_each_cluster(
 
     cluster_hulls = {}
     for cluster_id in cluster_ids:
-        # find the min and max points for the cluster_ids
-        max_x, max_y = np.max(np.where(clusters == cluster_id), axis=1)
-        min_x, min_y = np.min(np.where(clusters == cluster_id), axis=1)
-
-        # crop the image to the cluster
-        cropped_img = binary_img[min_x:max_x, min_y:max_y]
+        # crop the image to the cluster only include the cluster
+        cropped_img = np.where(clusters == cluster_id, binary_img, 0)
 
         # get the convex hull for the cropped image
         hull = generate_convex_hull(cropped_img)
-
-        # shift the hull back to the original image
-        hull = [np.array([point[0] + min_y, point[1] + min_x]) for point in hull]
 
         if len(hull) != 0:
             cluster_hulls[cluster_id] = hull
