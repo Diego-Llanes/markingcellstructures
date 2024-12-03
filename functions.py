@@ -229,5 +229,31 @@ def generate_convex_hull(
     return hull
 
 
+def channel_wise_cluster_alignment(
+    center_of_masses: List[Dict[int, Point]],
+    epsilons: float,
+):
+    """
+    args:
+        center_of_masses: List[Dict[int, Point]] - a list of 3 dictionaries
+        where each dictionary is a cluster_id to center of mass
+    returns:
+        aligned_COMs: List[Dict[int, Point]] - a list of 3 dictionaries where
+        each dictionary is a cluster_id to center of mass, where cluster_ids
+        are aligned across channels. The clusters that do not have cooresponding
+        clusters in other channels are removed.
+    """
+    # start off in first channel blindly
+    for cluster in center_of_masses[0]:
+        dists = []
+        for remaining_clusters in center_of_masses[1:]:
+            for id_, COM in remaining_clusters.items():
+                dists.append(
+                    np.linalg.norm(
+                        cluster["COM"] - COM,
+                    )
+                )
+
+
 if __name__ == "__main__":
     ...
