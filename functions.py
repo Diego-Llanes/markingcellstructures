@@ -9,35 +9,33 @@ from typing import List, Tuple, Dict
 
 from collections import namedtuple
 
-Point = namedtuple('Point', ['x', 'y']) # only used for type hinting
+Point = namedtuple("Point", ["x", "y"])  # only used for type hinting
 
 
 # source: https://forum.image.sc/t/finding-the-best-focused-slice-in-a-z-stack/103401
-    # this is the discussion post i used for below.
+# this is the discussion post i used for below.
+
 
 # approach #1:
-def calc_normalized_variance(
-    img: np.ndarray
-) -> int:
+def calc_normalized_variance(img: np.ndarray) -> int:
 
-    mean   = np.mean(img)
+    mean = np.mean(img)
     height = img.shape[0]
-    width  = img.shape[1]
+    width = img.shape[1]
 
-    fi = (img - mean)**2
-    b  = np.sum(fi)
+    fi = (img - mean) ** 2
+    b = np.sum(fi)
 
     normalized_variance = b / (height * width * mean)
 
     return normalized_variance
 
-def find_best_z_slice(
-    img: np.ndarray
-) -> int:
-    
-    z_slices                 = img.shape[0]
+
+def find_best_z_slice(img: np.ndarray) -> int:
+
+    z_slices = img.shape[0]
     best_normalized_variance = 0
-    best_z_slice_idx         = 0
+    best_z_slice_idx = 0
 
     for i in range(z_slices):
 
@@ -46,16 +44,17 @@ def find_best_z_slice(
         if normalized_variance > best_normalized_variance:
 
             best_normalized_variance = normalized_variance
-            best_z_slice_idx         = i
+            best_z_slice_idx = i
 
     return best_z_slice_idx
+
 
 # approach #2:
 # # find_best_z_slice().
 # def find_best_z_slice(
 #     img: np.ndarray,
 # ) -> int:
-    
+
 #     # number of z-slices.
 #     z_slices = img.shape[0]
 
@@ -72,7 +71,7 @@ def find_best_z_slice(
 #         # compute the mean of the absolute values of the array above.
 #             # this represents the average amount of intensity change.
 #         laplacian_score = np.mean(np.abs(laplacian))
-        
+
 #         # spread of the pixel intensity values within a slice.
 #         variance = np.var(img[i])
 
@@ -80,9 +79,9 @@ def find_best_z_slice(
 #             # this represents the overall sharpness of the slice.
 #         current_score = variance + laplacian_score
 
-#         # if our current score is higher than the best score, 
+#         # if our current score is higher than the best score,
 #         if current_score > best_score:
-            
+
 #             # keep track of it.
 #             best_score       = current_score
 #             best_z_slice_idx = i
@@ -95,10 +94,12 @@ def threshold_image(
     channel_img: np.ndarray,
     threshold_p: float,
 ) -> cv2.threshold:
-    ''' return a binary map threshold image'''
+    """return a binary map threshold image"""
 
     # min max normalize the image
-    channel_img = (channel_img - channel_img.min()) / (channel_img.max() - channel_img.min())
+    channel_img = (channel_img - channel_img.min()) / (
+        channel_img.max() - channel_img.min()
+    )
 
     ret, thresh = cv2.threshold(
         channel_img,
@@ -115,11 +116,7 @@ def find_clusters(
     min_samples=50,
 ) -> np.ndarray:
 
-    points = np.column_stack(
-        np.where(
-            channel_img > 0
-        )
-    )
+    points = np.column_stack(np.where(channel_img > 0))
 
     # find clusters using DBSCAN
     dbscan = DBSCAN(
@@ -132,15 +129,15 @@ def find_clusters(
     num_clusters = len(set(labels)) - (1 if -1 in labels else 0)
     cluster_mask = np.ones((1200, 1200)) * -2
 
-    for (coord, label) in zip(points, labels):
+    for coord, label in zip(points, labels):
         cluster_mask[coord[0], coord[1]] = label
 
     return cluster_mask
 
 
 def get_convex_hull_for_each_cluster(
-        binary_img: np.ndarray,
-        clusters: np.ndarray,
+    binary_img: np.ndarray,
+    clusters: np.ndarray,
 ) -> Dict[int, List[Point]]:
     """
     take in a binary image and return a dictionary of cluster_id to convex hull
@@ -170,7 +167,8 @@ def get_convex_hull_for_each_cluster(
         # shift the hull back to the original image
         hull = [np.array([point[0] + min_y, point[1] + min_x]) for point in hull]
 
-        cluster_hulls[cluster_id] = hull
+        if len(hull) != 0:
+            cluster_hulls[cluster_id] = hull
 
     return cluster_hulls
 
@@ -193,7 +191,7 @@ def find_COM_for_each_cluster(
 
         # create a meshgrid of x and y indices
         y_indices, x_indices = np.meshgrid(
-            np.arange(img.shape[0]), np.arange(img.shape[1]), indexing='ij'
+            np.arange(img.shape[0]), np.arange(img.shape[1]), indexing="ij"
         )
 
         # calculate the center of mass
@@ -207,7 +205,7 @@ def find_COM_for_each_cluster(
 
 
 def generate_convex_hull(
-    binary_img: np.ndarray, # cropped image
+    binary_img: np.ndarray,  # cropped image
 ) -> List[Point]:
     """
     This will take a binary image and wrap all the points in a convex hull.

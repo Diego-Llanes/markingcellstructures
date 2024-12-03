@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import List, Dict
 
-from functions import find_best_z_slices, threshold_image, generate_convex_hull, Point
+from functions import find_best_z_slice, threshold_image, generate_convex_hull, Point
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
 
@@ -115,7 +115,7 @@ def plot_COMs_of_clusters(
 def convex_hull_demo(
     img: np.ndarray,
 ) -> None:
-    z_slices = find_best_z_slices(img)
+    z_slices = find_best_z_slice(img)
     threshed_image: cv2.threshold = threshold_image(
         img=img,
         z_slices=z_slices,
