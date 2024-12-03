@@ -88,9 +88,7 @@ def main():
         zslice = 24 # find_best_zslices(channel_img)
         best_slice = channel_img[zslice]
         
-        best_threshold = determine_best_parameters(best_slice, (95, 96))
-        print("Threshold: " + str(best_threshold))
-        thresh = threshold_image(channel_img[zslice], 0.9)
+        threshold = determine_best_parameters(best_slice, (95, 96))
         # for channel_idx, channel in enumerate(channels):
             # channel_img = img[:, channel_idx]
             # zslice = 24 # find_best_zslices(channel_img)

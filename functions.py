@@ -76,7 +76,7 @@ def determine_best_parameters(
         print("Testing threshold " + str(percentile))
         thresholded_img = threshold_image(channel_img, percentile)
         cluster_mask = find_clusters(thresholded_img)
-        _debug_show_clusters(cluster_mask)
+        # _debug_show_clusters(cluster_mask)
         process_clusters(channel_img, cluster_mask)
         scores.append(objective(cluster_mask))
     print(scores)
@@ -90,9 +90,9 @@ def determine_best_parameters(
 # Debug: Shows each cluster and what the blob detector picks up.
 def process_clusters(channel_img, cluster_mask):
     cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
-    print(channel_img.shape)
     
     #Isolate each cluster to its own image and then threshold for the spots that appear bright.
+    cluster_cilia = []
     for cluster in cluster_ids:
         # Copy channel_img values over if they are in the mask
         # Find the min and max of the values within the mask for remapping values
@@ -106,10 +106,15 @@ def process_clusters(channel_img, cluster_mask):
         
         # normalize the brightnesses to be in 0-255.
         remapped = remap_values(masked, cluster_min, cluster_max, 0, 255)
-        # isolate_bright_spots(remapped)
-        _debug_show_cluster_normalized(remapped, cluster)
-        
-        
+        cluster_cilia.append(isolate_bright_spots(remapped))
+        #_debug_show_cluster_normalized(remapped, cluster)
+    
+    #Combine masks
+    stacked = np.zeros(dtype=np.uint8, shape=channel_img.shape)
+    for cluster_cilia_mask in cluster_cilia:
+        stacked = cv2.bitwise_or(stacked, cluster_cilia_mask)
+    plt.imshow(stacked, interpolation='none')
+    plt.show()
 
 # Remap values of a 2d array from one range to another. min1 max1 to min2 max2.
 # might result in floating point values?
@@ -131,11 +136,21 @@ def isolate_bright_spots(img):
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        61,
-        -100
+        21, # May depend on zoom
+        -20
     )
-    plt.imshow(thresh, interpolation='none')
-    plt.show()
+    kernel_size = (3,3) #May depend on zoom
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
+    opened_img = cv2.morphologyEx(
+        thresh,
+        cv2.MORPH_OPEN,
+        kernel,
+    )
+    # plt.imshow(thresh, interpolation='none')
+    # plt.show()
+    # plt.imshow(opened_img, interpolation='none')
+    # plt.show()
+    return opened_img
 
 # DEBUG. Visualize computed clusters.
 def _debug_show_clusters(cluster_mask):
