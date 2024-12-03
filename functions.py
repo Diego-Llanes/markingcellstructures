@@ -77,18 +77,51 @@ def determine_best_parameters(
         thresholded_img = threshold_image(channel_img, percentile)
         cluster_mask = find_clusters(thresholded_img)
         _debug_show_clusters(cluster_mask)
-        
+        process_clusters(channel_img, cluster_mask)
         scores.append(objective(cluster_mask))
     print(scores)
     # Will be for looking at results of objective function.
     plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
     plt.show()
 
-#
+# Use the cluster mask to extract what was detected to be each cluster.
+# After isolating each cluster, normalize the brightnesses to 0-255.
+# run blob detection with parameters tuned for cilia (likely inertia, area, and/or threshold)
+# Debug: Shows each cluster and what the blob detector picks up.
 def process_clusters(channel_img, cluster_mask):
     cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
+    print(channel_img.shape)
+    
     for cluster in cluster_ids:
-        print("Normalize each cluster and do stuff")
+        # Copy channel_img values over if they are in the mask
+        # Find the min and max of the values within the mask for remapping values
+        mask = (cluster_mask == cluster)
+        
+        cluster_max = np.max(channel_img[mask]) if np.any(mask) else 0
+        cluster_min = np.min(channel_img[mask]) if np.any(mask) else 0
+        
+        masked = np.full_like(channel_img, fill_value=cluster_min)
+        masked[mask] = channel_img[mask]
+        
+        remapped = remap_values(masked, cluster_min, cluster_max, 0, 255)
+        
+        _debug_show_cluster_normalized(remapped, cluster)
+        
+        
+        #Go through the image. For each cluster, normalize the brightnesses to be in 0-255.
+
+# Remap values of a 2d array from one range to another. min1 max1 to min2 max2.
+# might result in floating point values?
+def remap_values(img, min1, max1, min2, max2):
+    range1 = max1-min1
+    range2 = max2-min2
+    for i in range(len(img)):
+        for j in range(len(img[0])):
+            val = img[i,j]
+            percent = (val-min1)/range1
+            remapped = min2 + (percent*range2)
+            img[i,j] = remapped
+    return img
 
 # DEBUG. Visualize computed clusters.
 def _debug_show_clusters(cluster_mask):
@@ -115,8 +148,10 @@ def _debug_show_clusters(cluster_mask):
     plt.legend(handles=patches, bbox_to_anchor=(1.85,1.0))
     plt.show()
 
-def _debug_show_clusters_normalized():
-    print("Nothing here yet")
+def _debug_show_cluster_normalized(masked_remapped_cluster, number):
+        plt.imshow(masked_remapped_cluster, interpolation='none')
+        plt.suptitle("clusters")
+        plt.show()
 
 def objective(cluster_mask):
     # FIXME

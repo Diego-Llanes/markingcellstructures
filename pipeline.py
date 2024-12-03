@@ -45,7 +45,7 @@ notes:
 # broadly cluster the regions so we can operate on each independently.
 #   2. DBSCAN the remaining image. This will produce our cluster mask.
 # Now we have our independent clusters. Each cluster will be narrowed down to a cilia (or multiple?) later.
-#   3. For each cluster, we want to normalize the values to a decent range, ignoring noise and background.
+#   3. For each cluster, we want to normalize the values to a decent range, ignoring noise cluster and background cluster.
 #   4. Now with our normalized cluster, we will run blob detection. We should filter by circularity and color.
 # All detected blobs are assumed to be cilia with a relatively high degree of confidence.
 # It's very likely that non-cilia are detected, but these will be filtered out when we don't find one of the other necessary cell structures nearby.
