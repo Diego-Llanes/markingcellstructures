@@ -17,16 +17,15 @@ from visualizations import (
 
 TIF_FILE = Path("data/_1_MMStack_Pos0.ome.tif")
 CHANNEL_TO_VIEW = 2
-PERCENTAGE_THRESHOLD = 0.5
-EPS = 100
-MIN_SAMPLES = 2
+PERCENTAGE_THRESHOLD = 0.3
+EPS = 5
+MIN_SAMPLES = 20
 
 
 def test_find_COM_for_each_cluster():
     img = tifffile.imread(TIF_FILE)
     img = img[:, CHANNEL_TO_VIEW]
 
-    # find best zslice and threshold it to above 70%
     best_zslice = find_best_z_slice(img)
     img = img[best_zslice]
     binary_img = threshold_image(img, PERCENTAGE_THRESHOLD)
