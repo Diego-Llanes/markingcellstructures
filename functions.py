@@ -81,8 +81,8 @@ def determine_best_parameters(
         scores.append(objective(cluster_mask))
     print(scores)
     # Will be for looking at results of objective function.
-    plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
-    plt.show()
+    # plt.scatter(np.arange(thresh_range[0], thresh_range[1], 1), scores)
+    # plt.show()
 
 # Use the cluster mask to extract what was detected to be each cluster.
 # After isolating each cluster, normalize the brightnesses to 0-255.
@@ -92,6 +92,7 @@ def process_clusters(channel_img, cluster_mask):
     cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
     print(channel_img.shape)
     
+    #Isolate each cluster to its own image and then threshold for the spots that appear bright.
     for cluster in cluster_ids:
         # Copy channel_img values over if they are in the mask
         # Find the min and max of the values within the mask for remapping values
@@ -103,12 +104,12 @@ def process_clusters(channel_img, cluster_mask):
         masked = np.full_like(channel_img, fill_value=cluster_min)
         masked[mask] = channel_img[mask]
         
+        # normalize the brightnesses to be in 0-255.
         remapped = remap_values(masked, cluster_min, cluster_max, 0, 255)
-        
+        # isolate_bright_spots(remapped)
         _debug_show_cluster_normalized(remapped, cluster)
         
         
-        #Go through the image. For each cluster, normalize the brightnesses to be in 0-255.
 
 # Remap values of a 2d array from one range to another. min1 max1 to min2 max2.
 # might result in floating point values?
@@ -122,6 +123,19 @@ def remap_values(img, min1, max1, min2, max2):
             remapped = min2 + (percent*range2)
             img[i,j] = remapped
     return img
+
+def isolate_bright_spots(img):
+    img = np.uint8(img)
+    thresh = cv2.adaptiveThreshold(
+        img,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        61,
+        -100
+    )
+    plt.imshow(thresh, interpolation='none')
+    plt.show()
 
 # DEBUG. Visualize computed clusters.
 def _debug_show_clusters(cluster_mask):
@@ -148,10 +162,23 @@ def _debug_show_clusters(cluster_mask):
     plt.legend(handles=patches, bbox_to_anchor=(1.85,1.0))
     plt.show()
 
+#Used for showing each cluster isolated from everything else.
+# Auto zooms to important area.
 def _debug_show_cluster_normalized(masked_remapped_cluster, number):
-        plt.imshow(masked_remapped_cluster, interpolation='none')
-        plt.suptitle("clusters")
-        plt.show()
+    plt.imshow(masked_remapped_cluster, interpolation='none')
+    plt.suptitle("cluster " + str(number))
+    plt.show()
+
+# Display the pixel brightnesses of an channel image as a histogram.
+# Use start if you want to start from a specific brightness
+def _debug_plot_histogram(channel_img, start=0):
+    plt.xlabel("Pixel brightness")
+    plt.ylabel("Pixel count")
+    
+    max_val = np.max(channel_img)
+    plt.plot(cv2.calcHist([channel_img], [0], None, [max_val], [start,max_val]))
+    plt.show()
+    
 
 def objective(cluster_mask):
     # FIXME
