@@ -116,11 +116,11 @@ def plot_full_image_of_clusters_and_COMs(
     hulls: List[Dict[int, List[Point]]],
     COMs: List[Dict[int, Point]],
     show: bool = True,
-    channels = ["Cilia", "Golgi", "Cilia Base"],
+    channel_names = ["Cilia", "Golgi", "Cilia Base"],
 ) -> None:
 
-    fig, ax = plt.subplots(1, len(channels), figsize=(5 * len(channels), 5))
-    for channel_idx, channel in enumerate(channels):
+    fig, ax = plt.subplots(1, len(channel_names), figsize=(5 * len(channel_names), 5))
+    for channel_idx, channel in enumerate(channel_names):
         ax[channel_idx].imshow(img[channel_idx], cmap="gray")
         for cluster, hull in hulls[channel_idx].items():
             hull_closed = np.vstack([hull, hull[0]])

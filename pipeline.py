@@ -10,10 +10,26 @@ from sklearn.cluster import DBSCAN
 from pathlib import Path
 from typing import List, Tuple, Dict
 from collections import namedtuple
+from argparse import ArgumentParser
 
-from functions import find_best_z_slices, threshold_image, find_clusters
+from functions import (
+    find_best_z_slice,
+    threshold_image,
+    get_convex_hull_for_each_cluster,
+    find_clusters,
+    find_COM_for_each_cluster,
+    channel_wise_cluster_alignment,
+)
+
+from visualizations import (
+    plot_hulls_of_clusters,
+    plot_COMs_of_clusters,
+    plot_full_image_of_clusters_and_COMs,
+)
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
+EPS = (3, 12, 5)
+MIN_SAMPLES = (10, 70, 75)
 
 """
 notes:
@@ -21,64 +37,122 @@ notes:
 """
 
 
-def main():
-    files = list(DATA_DIR.rglob("*.tif"))
-    sample = files[0]
-    img = tifffile.imread(sample)
-    
-    channels = [
-        "Cilia",
-        "Golgi",
-        "Cilia Base",
-    ]
-    
-    custom_colors = ["lightgray", "cyan", "blue", "red", "green", "yellow", "orange", "purple"]
-    cmap = ListedColormap(custom_colors)
-    boundaries = [-2, -1, 0, 1, 2, 3, 4, 5]
-    norm = BoundaryNorm(boundaries, cmap.N)
+def parse_args():
+    parser = ArgumentParser(
+        usage="""
+python pipeline.py --image <image_name> # to process a single image
+or
+python pipeline.py --data_dir <path_to_data_dir> # to process all images in the given directory
+"""
+    )
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        help=f"Path to the directory containing the data",
+    )
+    parser.add_argument(
+        "--image",
+        type=str,
+        help="Name of the data image to be processed",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="output",
+        help="Name of the output directory\ndefault is 'output'",
+    )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Show the plots",
+    )
+    args = parser.parse_args()
+    assert not (args.data_dir and args.image), "Please provide either --data_dir or --image"
+    return args
 
-    # find best z_slice (might just be 24 ??)
-    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(15, 15))
-    for channel_idx, channel in enumerate(channels):
 
-        channel_img = img[:, channel_idx]
-        zslice = find_best_z_slices(channel_img)
+def process_image(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
-        thresh = threshold_image(channel_img[zslice], 0.7)
+    all_COMs = []
+    all_hulls = []
+    all_zslices = []
 
-        axs[channel_idx][0].imshow(channel_img[zslice])
-        axs[channel_idx][1].imshow(thresh)
-        axs[channel_idx][0].set_title("zslice")
-        axs[channel_idx][1].set_title("threshold")
+    for i in range(3):
+        # get the channel
+        channel_img = image[:, i]
 
-        # move the background and noise to (0, 1)
-        cluster_mask = find_clusters(thresh, 50)
-        
-        # cluster counts
-        values = set(cluster_mask.flatten())
-        counts = {-2: 0, -1: 0}
-        for value in values:
-            count = (cluster_mask == value).sum().item()
-            counts[value.item()] = count
+        best_zslice = find_best_z_slice(channel_img)
+        all_zslices.append(best_zslice)
+        channel_img = channel_img[best_zslice]
 
-        cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
-        num_clusters = len(cluster_ids)
-        
-        cmap = plt.get_cmap('tab10')
-        norm = mcolors.Normalize(vmin=-2, vmax=cluster_mask.max())
+        # TODO: thresholding @Parker
+        binary_img = threshold_image(channel_img, 0.7)
 
-        axs[channel_idx][2].imshow(cluster_mask, cmap=cmap, norm=norm)
-        axs[channel_idx][2].set_title("clusters")
-        axs[channel_idx][2].set_xlabel(f"num clusters={num_clusters}")
+        # find clusters
+        clusters = find_clusters(
+            binary_img,
+            eps=EPS[i],
+            min_samples=MIN_SAMPLES[i],
+        )
 
-        legend_colors = [cmap(norm(val)) for val in values]
-        patches = [Patch(color=color, label=f"cluster {val}: {counts[val]}") for val, color in zip(values, legend_colors)]
-        axs[channel_idx][2].legend(handles=patches, bbox_to_anchor=(1.85,1.0))
+        convex_hulls = get_convex_hull_for_each_cluster(
+            binary_img,
+            clusters,
+        )
+        all_hulls.append(convex_hulls)
 
-        axs[channel_idx][0].set_ylabel(channel)
+        COMs = find_COM_for_each_cluster(
+            img=channel_img,
+            cluster_hulls=convex_hulls,
+        )
 
-    fig.suptitle(sample.name.split(".")[0])
-    plt.show()
+        all_COMs.append(COMs)
+
+    final_triplet_of_cluster_ids, good_cluster_ids = channel_wise_cluster_alignment(
+        all_COMs,
+        100
+    )
+
+    final_COMS = [{}, {}, {}]
+    final_hulls = [{}, {}, {}]
+    for i in range(3):
+        channel_COMs = all_COMs[i]
+        channel_hulls = all_hulls[i]
+
+        for id, point in channel_COMs.items():
+            if id in good_cluster_ids[i]:
+                final_COMS[i][id] = point
+
+        for id, hull in channel_hulls.items():
+            if id in good_cluster_ids[i]:
+                final_hulls[i][id] = hull
+
+    return final_COMS, final_hulls, all_zslices
+
+
+def process_data(data_dir: Path) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
+    ...
+
+
+def main() -> None:
+    args = parse_args()
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(exist_ok=True)
+
+    if args.image:
+        image = tifffile.imread(args.image)
+        final_COMS, final_hulls, final_zslices = process_image(image)
+        img_channels: List[np.ndarray] = [image[final_zslices[i]][i] for i in range(3)]
+        if args.show:
+            plot_full_image_of_clusters_and_COMs(
+                img=img_channels,
+                hulls=final_hulls,
+                COMs=final_COMS,
+                channel_names=["Cilia", "Golgi", "Cilia Base"],
+            )
+    else:
+        data_dir = Path(args.data_dir)
+        raise NotImplementedError("Processing all images in a directory is not implemented yet")
 
 
 if __name__ == "__main__":
