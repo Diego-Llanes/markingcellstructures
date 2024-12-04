@@ -116,19 +116,30 @@ def plot_full_image_of_clusters_and_COMs(
     hulls: List[Dict[int, List[Point]]],
     COMs: List[Dict[int, Point]],
     show: bool = True,
+    triplets: List[List[int]] = None,
     channel_names = ["Cilia", "Golgi", "Cilia Base"],
 ) -> None:
 
+
     fig, ax = plt.subplots(1, len(channel_names), figsize=(5 * len(channel_names), 5))
-    for channel_idx, channel in enumerate(channel_names):
+    for channel_idx, channel_name in enumerate(channel_names):
+
         ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+
         for cluster, hull in hulls[channel_idx].items():
             hull_closed = np.vstack([hull, hull[0]])
-            ax[channel_idx].plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+
+            if triplets is None:
+                color = ...
+            else:
+                color = ...
+
+            ax[channel_idx].plot(hull_closed[:, 0], hull_closed[:, 1], color, linewidth=2)
 
         for cluster, COM in COMs[channel_idx].items():
             ax[channel_idx].scatter(COM[0], COM[1], c="b", s=50)
-        ax[channel_idx].set_title(channel)
+
+        ax[channel_idx].set_title(channel_name)
     if show:
         plt.show()
 

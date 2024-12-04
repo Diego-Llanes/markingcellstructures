@@ -224,7 +224,7 @@ def generate_convex_hull(
 
 def channel_wise_cluster_alignment(
     center_of_masses: List[Dict[int, Point]],
-    epsilons: float,
+    epsilon: float,
 ):
     """
     args:
@@ -296,7 +296,7 @@ def channel_wise_cluster_alignment(
                 closest_match = None
                 min_distance = float('inf')
                 for other_cluster_id, distance in pairwise_distances.get(i, {}).get(cluster_id, {}).get(other_channel, {}).items():
-                    if distance <= epsilons and distance < min_distance:
+                    if distance <= epsilon and distance < min_distance:
                         closest_match = other_cluster_id
                         min_distance = distance
 

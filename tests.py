@@ -87,6 +87,7 @@ def test_channel_wise_cluster_alignment():
         ],
         hulls=final_hulls,
         COMs=final_COMS,
+        triplets=final_triplet_of_cluster_ids,
         channel_names=["Cilia", "Golgi", "Cilia Base"],
     )
 
