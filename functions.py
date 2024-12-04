@@ -141,7 +141,6 @@ def create_thresh_params(
 def compute_best_threshold(
     channel: int,
     channel_img: np.ndarray,
-    thresh_range: Tuple[float, float],
     ):
     
     # Ranges for tuning each channel.
@@ -159,6 +158,7 @@ def compute_best_threshold(
         15, 300, #Golgi are more concentrated blobs compared to cilia
         65, -20
     )
+    #fuck it we ball
     cilia_base_params = create_thresh_params(
         'cilia_base',
         0.96,
@@ -169,20 +169,16 @@ def compute_best_threshold(
     channel_configuration = [cilia_params, golgi_params, cilia_base_params]
     config = channel_configuration[channel]
     
-    #FIXME Future work? We're only looking at the first element in the range.
-    # There's no point in actually doing anything iterative here because we don't have an objective function.
-    for percentile in range(thresh_range[0], thresh_range[1], 1):
-        percentile /= 100
-        thresholded_img = threshold_image(channel_img, config['global_thresh_percentile'])
-        
-        cluster_mask = find_clusters(
-            thresholded_img,
-            eps=config['cluster_epsilon'],
-            min_samples=config['cluster_samples']
-        )
-        
-        # _debug_show_clusters(cluster_mask)
-        return process_clusters(channel_img, cluster_mask, config)
+    thresholded_img = threshold_image(channel_img, config['global_thresh_percentile'])
+    
+    cluster_mask = find_clusters(
+        thresholded_img,
+        eps=config['cluster_epsilon'],
+        min_samples=config['cluster_samples']
+    )
+    
+    # _debug_show_clusters(cluster_mask)
+    return process_clusters(channel_img, cluster_mask, config)
 
 
 # Use the cluster mask to extract what was detected to be each cluster.
@@ -214,7 +210,7 @@ def process_clusters(channel_img, cluster_mask, config):
     stacked = np.zeros(dtype=np.uint8, shape=channel_img.shape)
     for cluster_cilia_mask in cluster_cilia:
         stacked = cv2.bitwise_or(stacked, cluster_cilia_mask)
-    _debug_show_image(stacked, "Final step: thresholded clusters stacked together")
+    # _debug_show_image(stacked, "Final step: thresholded clusters stacked together")
     return stacked
 
 # Remap values of a 2d array from one range to another. min1 max1 to min2 max2.
@@ -369,6 +365,131 @@ def generate_convex_hull(
     hull = hull[:, 0, :]
 
     return hull
+
+
+def channel_wise_cluster_alignment(
+    center_of_masses: List[Dict[int, Point]],
+    epsilons: float,
+):
+    """
+    args:
+        center_of_masses: List[Dict[int, Point]] - a list of 3 dictionaries
+        where each dictionary is a cluster_id to center of mass
+    returns:
+        aligned_COMs: List[Dict[int, Point]] - a list of 3 dictionaries where
+        each dictionary is a cluster_id to center of mass, where cluster_ids
+        are aligned across channels. The clusters that do not have cooresponding
+        clusters in other channels are removed.
+    """
+    """
+    DS we need:
+    pairwise_distances = {
+        channel_id: {
+            cluster_id: {
+                other_channel_id: {
+                    other_cluster_id: distance
+                }
+            }
+        },
+        ...
+    }
+    """
+    # compute the pairwise distances between the center of masses for each channel and each cluster
+
+    pairwise_distances = {}
+    for i in range(3):
+        for j in range(3):
+            if i == j:
+                continue
+            for cluster_id, COM in center_of_masses[i].items():
+                for other_cluster_id, other_COM in center_of_masses[j].items():
+                    distance = np.linalg.norm(COM - other_COM)
+                    if i not in pairwise_distances:
+                        pairwise_distances[i] = {}
+                    if cluster_id not in pairwise_distances[i]:
+                        pairwise_distances[i][cluster_id] = {}
+                    if j not in pairwise_distances[i][cluster_id]:
+                        pairwise_distances[i][cluster_id][j] = {}
+                    pairwise_distances[i][cluster_id][j][other_cluster_id] = distance
+
+    # Step 2: Filter clusters to retain only those with correspondences in all three channels
+    """
+    each tuple in channel_cluster_triplets is of the form:
+    [
+            (cluster_id, cluster_id, cluster_id),
+            (cluster_id, cluster_id, cluster_id),
+            (cluster_id, cluster_id, cluster_id),
+        ...
+    ]
+    and represents a triplet of clusters that have correspondences in all three channels
+    so the length of channel_cluster_triplets is the number of full structures
+    that we have
+    """
+    # Step 2: Filter clusters to retain only those with correspondences in all three channels
+    channel_cluster_triplets = []
+    for i in range(3):
+        for cluster_id in center_of_masses[i]:
+            valid_triplet = True
+            matched_ids = [None, None, None]
+            matched_ids[i] = cluster_id
+
+            for other_channel in range(3):
+                if other_channel == i:
+                    continue
+
+                # Find closest cluster in other_channel within epsilon radius
+                closest_match = None
+                min_distance = float('inf')
+                for other_cluster_id, distance in pairwise_distances.get(i, {}).get(cluster_id, {}).get(other_channel, {}).items():
+                    if distance <= epsilons and distance < min_distance:
+                        closest_match = other_cluster_id
+                        min_distance = distance
+
+                if closest_match is None:
+                    valid_triplet = False
+                    break
+                matched_ids[other_channel] = closest_match
+
+            # If a valid triplet exists, add it to channel_cluster_triplets
+            if valid_triplet and None not in matched_ids:
+                triplet = tuple(matched_ids)
+                if triplet not in channel_cluster_triplets:  # Avoid duplicates
+                    channel_cluster_triplets.append(triplet)
+
+    # Step 3: Compute the cumalative distance between the clusters in each triplet
+    """
+    each tuple in channel_cluster_triplets is of the form:
+    [
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ...
+    ]
+    """
+    cum_distances = []
+    for triplet in channel_cluster_triplets:
+        cum_dist = 0
+        for i in range(3):
+            for j in range(3):
+                if i == j:
+                    continue
+                cum_dist += pairwise_distances[i][triplet[i]][j][triplet[j]]
+        cum_distances.append((triplet, cum_dist))
+
+    # Step 4: Sort the triplets by cumulative distance
+    cum_distances.sort(key=lambda x: x[1])
+    seen_clusters = [
+        set() for _ in range(3)
+    ]
+    final_triplets = []
+    for triplet, dist in cum_distances:
+        if not triplet[0] in seen_clusters[0] and not triplet[1] in seen_clusters[1] and not triplet[2] in seen_clusters[2]:
+            seen_clusters[0].add(triplet[0])
+            seen_clusters[1].add(triplet[1])
+            seen_clusters[2].add(triplet[2])
+            final_triplets.append(triplet)
+    
+    return final_triplets, seen_clusters
 
 
 if __name__ == "__main__":
