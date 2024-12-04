@@ -236,16 +236,85 @@ def channel_wise_cluster_alignment(
         are aligned across channels. The clusters that do not have cooresponding
         clusters in other channels are removed.
     """
-    # start off in first channel blindly
-    for cluster in center_of_masses[0]:
-        dists = []
-        for remaining_clusters in center_of_masses[1:]:
-            for id_, COM in remaining_clusters.items():
-                dists.append(
-                    np.linalg.norm(
-                        cluster["COM"] - COM,
-                    )
-                )
+    """
+    DS we need:
+    pairwise_distances = {
+        channel_id: {
+            cluster_id: {
+                other_channel_id: {
+                    other_cluster_id: distance
+                }
+            }
+        },
+        ...
+    }
+    """
+    # compute the pairwise distances between the center of masses for each channel and each cluster
+
+    pairwise_distances = {}
+    for i in range(3):
+        for j in range(3):
+            if i == j:
+                continue
+            for cluster_id, COM in center_of_masses[i].items():
+                for other_cluster_id, other_COM in center_of_masses[j].items():
+                    distance = np.linalg.norm(COM - other_COM)
+                    if i not in pairwise_distances:
+                        pairwise_distances[i] = {}
+                    if cluster_id not in pairwise_distances[i]:
+                        pairwise_distances[i][cluster_id] = {}
+                    if j not in pairwise_distances[i][cluster_id]:
+                        pairwise_distances[i][cluster_id][j] = {}
+                    pairwise_distances[i][cluster_id][j][other_cluster_id] = distance
+
+    print(pairwise_distances)
+
+    # Step 2: Filter clusters to retain only those with correspondences in all three channels
+    """
+    each tuple in channel_cluster_triplets is of the form:
+    [
+            (cluster_id, cluster_id, cluster_id),
+            (cluster_id, cluster_id, cluster_id),
+            (cluster_id, cluster_id, cluster_id),
+        ...
+    ]
+    and represents a triplet of clusters that have correspondences in all three channels
+    so the length of channel_cluster_triplets is the number of full structures
+    that we have
+    """
+    # Step 2: Filter clusters to retain only those with correspondences in all three channels
+    channel_cluster_triplets = []
+    for i in range(3):
+        for cluster_id in center_of_masses[i]:
+            valid_triplet = True
+            matched_ids = [None, None, None]
+            matched_ids[i] = cluster_id
+
+            for other_channel in range(3):
+                if other_channel == i:
+                    continue
+
+                # Find closest cluster in other_channel within epsilon radius
+                closest_match = None
+                min_distance = float('inf')
+                for other_cluster_id, distance in pairwise_distances.get(i, {}).get(cluster_id, {}).get(other_channel, {}).items():
+                    if distance <= epsilons and distance < min_distance:
+                        closest_match = other_cluster_id
+                        min_distance = distance
+
+                if closest_match is None:
+                    valid_triplet = False
+                    break
+                matched_ids[other_channel] = closest_match
+
+            # If a valid triplet exists, add it to channel_cluster_triplets
+            if valid_triplet and None not in matched_ids:
+                triplet = tuple(matched_ids)
+                if triplet not in channel_cluster_triplets:  # Avoid duplicates
+                    channel_cluster_triplets.append(triplet)
+
+    import ipdb; ipdb.set_trace()
+    print(channel_cluster_triplets)
 
 
 if __name__ == "__main__":
