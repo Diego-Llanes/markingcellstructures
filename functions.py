@@ -71,13 +71,15 @@ def compute_threshold(
     channel_img: np.ndarray,
     thresh_range: Tuple[float, float],
     ):
+    #FIXME Future work? We're only looking at the first element in the range.
+    # There's no point in actually doing anything iterative here because we don't have an objective function.
     for percentile in range(thresh_range[0], thresh_range[1], 1):
         percentile /= 100
         print("Testing threshold " + str(percentile))
         thresholded_img = threshold_image(channel_img, percentile)
         cluster_mask = find_clusters(thresholded_img)
         # _debug_show_clusters(cluster_mask)
-        process_clusters(channel_img, cluster_mask)
+        return process_clusters(channel_img, cluster_mask)
 
 
 # Use the cluster mask to extract what was detected to be each cluster.
