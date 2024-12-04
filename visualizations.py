@@ -111,6 +111,27 @@ def plot_COMs_of_clusters(
     if show:
         plt.show()
 
+def plot_full_image_of_clusters_and_COMs(
+    img: list[np.ndarray],
+    hulls: List[Dict[int, List[Point]]],
+    COMs: List[Dict[int, Point]],
+    show: bool = True,
+    channels = ["Cilia", "Golgi", "Cilia Base"],
+) -> None:
+
+    fig, ax = plt.subplots(1, len(channels), figsize=(5 * len(channels), 5))
+    for channel_idx, channel in enumerate(channels):
+        ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+        for cluster, hull in hulls[channel_idx].items():
+            hull_closed = np.vstack([hull, hull[0]])
+            ax[channel_idx].plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
+
+        for cluster, COM in COMs[channel_idx].items():
+            ax[channel_idx].scatter(COM[0], COM[1], c="b", s=50)
+        ax[channel_idx].set_title(channel)
+    if show:
+        plt.show()
+
 
 def convex_hull_demo(
     img: np.ndarray,

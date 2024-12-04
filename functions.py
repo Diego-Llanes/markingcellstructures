@@ -267,8 +267,6 @@ def channel_wise_cluster_alignment(
                         pairwise_distances[i][cluster_id][j] = {}
                     pairwise_distances[i][cluster_id][j][other_cluster_id] = distance
 
-    print(pairwise_distances)
-
     # Step 2: Filter clusters to retain only those with correspondences in all three channels
     """
     each tuple in channel_cluster_triplets is of the form:
@@ -313,8 +311,40 @@ def channel_wise_cluster_alignment(
                 if triplet not in channel_cluster_triplets:  # Avoid duplicates
                     channel_cluster_triplets.append(triplet)
 
-    import ipdb; ipdb.set_trace()
-    print(channel_cluster_triplets)
+    # Step 3: Compute the cumalative distance between the clusters in each triplet
+    """
+    each tuple in channel_cluster_triplets is of the form:
+    [
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ((cluster_id, cluster_id, cluster_id), cum_dist),
+        ...
+    ]
+    """
+    cum_distances = []
+    for triplet in channel_cluster_triplets:
+        cum_dist = 0
+        for i in range(3):
+            for j in range(3):
+                if i == j:
+                    continue
+                cum_dist += pairwise_distances[i][triplet[i]][j][triplet[j]]
+        cum_distances.append((triplet, cum_dist))
+
+    # Step 4: Sort the triplets by cumulative distance
+    cum_distances.sort(key=lambda x: x[1])
+    seen_clusters = [
+        set() for _ in range(3)
+    ]
+    final_triplets = []
+    for triplet, dist in cum_distances:
+        if not triplet[0] in seen_clusters[0] and not triplet[1] in seen_clusters[1] and not triplet[2] in seen_clusters[2]:
+            seen_clusters[0].add(triplet[0])
+            seen_clusters[1].add(triplet[1])
+            seen_clusters[2].add(triplet[2])
+            final_triplets.append(triplet)
+    
+    return final_triplets, seen_clusters
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from functions import (
 from visualizations import (
     plot_hulls_of_clusters,
     plot_COMs_of_clusters,
+    plot_full_image_of_clusters_and_COMs,
 )
 
 
@@ -27,12 +28,15 @@ def test_channel_wise_cluster_alignment():
     img = tifffile.imread(TIF_FILE)
 
     all_COMs = []
+    all_hulls = []
+    all_zslices = []
     for i in range(3):
         # get the channel
         channel_img = img[:, i]
 
         # find best zslice and threshold it to above PERCENTAGE_THRESHOLD
         best_zslice = find_best_z_slice(channel_img)
+        all_zslices.append(best_zslice)
         channel_img = channel_img[best_zslice]
         binary_img = threshold_image(channel_img, PERCENTAGE_THRESHOLD)
 
@@ -47,16 +51,43 @@ def test_channel_wise_cluster_alignment():
             binary_img,
             clusters,
         )
+        all_hulls.append(convex_hulls)
 
         COMs = find_COM_for_each_cluster(
             img=channel_img,
             cluster_hulls=convex_hulls,
         )
+
         all_COMs.append(COMs)
 
-    aligned_COMs = channel_wise_cluster_alignment(
+    final_triplet_of_cluster_ids, good_cluster_ids = channel_wise_cluster_alignment(
         all_COMs,
         100
+    )
+
+    final_COMS = [{}, {}, {}]
+    final_hulls = [{}, {}, {}]
+    for i in range(3):
+        channel_COMs = all_COMs[i]
+        channel_hulls = all_hulls[i]
+
+        for id, point in channel_COMs.items():
+            if id in good_cluster_ids[i]:
+                final_COMS[i][id] = point
+
+        for id, hull in channel_hulls.items():
+            if id in good_cluster_ids[i]:
+                final_hulls[i][id] = hull
+
+    plot_full_image_of_clusters_and_COMs(
+        img=[
+            img[all_zslices[0]][0],
+            img[all_zslices[1]][1],
+            img[all_zslices[2]][2],
+        ],
+        hulls=final_hulls,
+        COMs=final_COMS,
+        channels=["Cilia", "Golgi", "Cilia Base"],
     )
 
 
