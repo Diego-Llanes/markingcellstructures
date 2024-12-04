@@ -14,7 +14,7 @@ from argparse import ArgumentParser
 
 from functions import (
     find_best_z_slice,
-    threshold_image,
+    compute_best_threshold,
     get_convex_hull_for_each_cluster,
     find_clusters,
     find_COM_for_each_cluster,
@@ -93,7 +93,7 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
 
         # TODO: thresholding @Parker
         threshold = threshold if threshold is not None else 0.3
-        binary_img = threshold_image(channel_img, threshold)
+        binary_img = compute_best_threshold(i, channel_img)
 
         # find clusters
         clusters = find_clusters(
