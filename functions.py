@@ -63,30 +63,78 @@ def get_percentile(channel_img, percentile):
     pixel_amt = math.ceil(len(flattened) * (1-percentile)) # Amount of pixels within the supplied percentile.
     return sorted_pixels[pixel_amt-1]
 
+def create_thresh_params(
+    name,
+    global_thresh_percentile,
+    cluster_epsilon, cluster_samples,
+    adaptive_block_size, adaptive_constant
+):
+    return {
+        'channel': name,
+        'global_thresh_percentile': global_thresh_percentile,
+        'cluster_epsilon': cluster_epsilon,
+        'cluster_samples': cluster_samples,
+        'adaptive_block_size': adaptive_block_size,
+        'adaptive_constant': adaptive_constant
+    }
 # Parameters determined:
 #   Global thresholding: Threshold percentile
 #   DBSCAN: Epsilon and min_samples
 # Done by computing each combination and using best results of objective function.
 def compute_threshold(
+    channel: int,
     channel_img: np.ndarray,
     thresh_range: Tuple[float, float],
     ):
+    
+    # Ranges for tuning each channel.
+    # These are basically magic numbers right now.
+    # They weren't derived with any rigor, just "ok yeah that seems to work for most of the images"
+    cilia_params = create_thresh_params(
+        'cilia',
+        0.95,
+        25, 125,
+        21, -20
+    )
+    golgi_params = create_thresh_params(
+        'golgi',
+        0.95,
+        15, 300, #Golgi are more concentrated blobs compared to cilia
+        65, -20
+    )
+    cilia_base_params = create_thresh_params(
+        'cilia_base',
+        0.96,
+        25, 190,
+        21, -10
+    )
+    
+    channel_configuration = [cilia_params, golgi_params, cilia_base_params]
+    config = channel_configuration[channel]
+    print(config)
+    
     #FIXME Future work? We're only looking at the first element in the range.
     # There's no point in actually doing anything iterative here because we don't have an objective function.
     for percentile in range(thresh_range[0], thresh_range[1], 1):
         percentile /= 100
         print("Testing threshold " + str(percentile))
-        thresholded_img = threshold_image(channel_img, percentile)
-        cluster_mask = find_clusters(thresholded_img)
-        # _debug_show_clusters(cluster_mask)
-        return process_clusters(channel_img, cluster_mask)
+        thresholded_img = threshold_image(channel_img, config['global_thresh_percentile'])
+        
+        cluster_mask = find_clusters(
+            thresholded_img,
+            eps=config['cluster_epsilon'],
+            samples=config['cluster_samples']
+        )
+        
+        _debug_show_clusters(cluster_mask)
+        return process_clusters(channel_img, cluster_mask, config)
 
 
 # Use the cluster mask to extract what was detected to be each cluster.
 # After isolating each cluster, normalize the brightnesses to 0-255.
-# run blob detection with parameters tuned for cilia (likely inertia, area, and/or threshold)
+# After that, isolate bright spots.
 # Debug: Shows each cluster and what the blob detector picks up.
-def process_clusters(channel_img, cluster_mask):
+def process_clusters(channel_img, cluster_mask, config):
     cluster_ids = sorted(list(set(cluster_mask.flatten()) - {-2, -1}))
     
     #Isolate each cluster to its own image and then threshold for the spots that appear bright.
@@ -104,9 +152,8 @@ def process_clusters(channel_img, cluster_mask):
         
         # The cluster points are copied, now normalize the brightnesses to be in 0-255.
         remapped = remap_values(masked, cluster_min, cluster_max, 0, 255)
-        cluster_cilia.append(isolate_bright_spots(remapped))
-        
-        #_debug_show_cluster_normalized(remapped, cluster)
+        _debug_show_cluster_normalized(remapped, cluster)
+        cluster_cilia.append(isolate_bright_spots(remapped, config))
     
     #Stack the masks together for the final thresholded image.
     stacked = np.zeros(dtype=np.uint8, shape=channel_img.shape)
@@ -132,28 +179,30 @@ def remap_values(img, min1, max1, min2, max2):
 # Take an isolated cluster with ranges from 0-255, and isolate the bright spots
 # which are hopefully at this point made up mostly of the features we want.
 # Currently mostly tuned for cilia.
-def isolate_bright_spots(img):
+def isolate_bright_spots(img, config):
     img = np.uint8(img)
-    thresh = cv2.adaptiveThreshold(
+    adaptive_thresh = cv2.adaptiveThreshold(
         img,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        21, # May depend on zoom
-        -20
+        config['adaptive_block_size'], # May depend on zoom
+        config['adaptive_constant']
     )
-    kernel_size = (3,3) #May depend on zoom
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
-    
-    # Get rid of tiny artifacts
-    opened_img = cv2.morphologyEx(
-        thresh,
-        cv2.MORPH_OPEN,
-        kernel,
-    )
-    # _debug_show_image(thresh)
-    # _debug_show_image(opened_img)
-    return opened_img
+    _debug_show_image(adaptive_thresh, title="after adaptive thresholding")
+    # Get rid of tiny artifacts for the cilia channel only
+    if config['channel'] == "cilia":
+        kernel_size = (3,3) #May depend on zoom
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_size)
+        final_thresh = cv2.morphologyEx(
+            adaptive_thresh,
+            cv2.MORPH_OPEN,
+            kernel,
+        )
+        
+        _debug_show_image(final_thresh, title="after opening morph")
+        return final_thresh
+    return adaptive_thresh
 
 def find_clusters(
     channel_img: np.ndarray,
