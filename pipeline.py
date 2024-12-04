@@ -115,7 +115,7 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
 
         all_COMs.append(COMs)
 
-    final_triplet_of_cluster_ids, good_cluster_ids = channel_wise_cluster_alignment(
+    final_triplets, good_cluster_ids = channel_wise_cluster_alignment(
         all_COMs,
         100
     )
@@ -134,7 +134,7 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
             if id in good_cluster_ids[i]:
                 final_hulls[i][id] = hull
 
-    return final_COMS, final_hulls, all_zslices
+    return final_COMS, final_hulls, all_zslices, final_triplets
 
 
 def process_data(data_dir: Path) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
@@ -150,13 +150,14 @@ def main() -> None:
 
     if args.image:
         image = tifffile.imread(args.image)
-        final_COMS, final_hulls, final_zslices = process_image(image, threshold_percent)
+        final_COMS, final_hulls, final_zslices, final_triplets = process_image(image, threshold_percent)
         img_channels: List[np.ndarray] = [image[final_zslices[i]][i] for i in range(3)]
         if args.show:
             plot_full_image_of_clusters_and_COMs(
                 img=img_channels,
                 hulls=final_hulls,
                 COMs=final_COMS,
+                triplets=final_triplets,
                 channel_names=["Cilia", "Golgi", "Cilia Base"],
             )
     else:
