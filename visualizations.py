@@ -2,6 +2,7 @@ import tifffile
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 from pathlib import Path
 from typing import List, Dict
@@ -121,7 +122,21 @@ def plot_full_image_of_clusters_and_COMs(
 ) -> None:
 
 
-    fig, ax = plt.subplots(1, len(channel_names), figsize=(5 * len(channel_names), 5))
+    fig, ax = plt.subplots(
+        1,
+        len(channel_names),
+        figsize=(5 * len(channel_names), 5),
+        sharex=True,
+        sharey=True,
+    )
+
+    if triplets is not None:
+        cmap = plt.cm.tab20  # Use the tab20 colormap
+        colors = [cmap(i / 20) for i in range(20)]  # Generate 20 distinct colors
+        triplet_colors = {tuple(triplet): colors[i % len(colors)] for i, triplet in enumerate(triplets)}
+    else:
+        triplet_colors = None
+
     for channel_idx, channel_name in enumerate(channel_names):
 
         ax[channel_idx].imshow(img[channel_idx], cmap="gray")
@@ -129,10 +144,12 @@ def plot_full_image_of_clusters_and_COMs(
         for cluster, hull in hulls[channel_idx].items():
             hull_closed = np.vstack([hull, hull[0]])
 
-            if triplets is None:
-                color = ...
-            else:
-                color = ...
+            color = "r"
+            if triplets is not None:
+                for triplet, triplet_color in triplet_colors.items():
+                    if cluster in triplet:
+                        color = triplet_color
+                        break
 
             ax[channel_idx].plot(hull_closed[:, 0], hull_closed[:, 1], color, linewidth=2)
 
