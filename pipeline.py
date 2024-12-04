@@ -93,7 +93,7 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
 
         # TODO: thresholding @Parker
         threshold = threshold if threshold is not None else 0.3
-        binary_img = compute_best_threshold(i, channel_img, threshold)
+        binary_img = compute_best_threshold(i, channel_img)
 
         # find clusters
         clusters = find_clusters(
