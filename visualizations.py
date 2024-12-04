@@ -25,9 +25,9 @@ def preprocessing_vis(img, channels):
         kernel = np.ones((15, 15), np.uint8)
         tophat = cv2.morphologyEx(filtered, cv2.MORPH_TOPHAT, kernel)
 
-        axs[channel_idx][0].imshow(channel_img, cmap="gray")
-        axs[channel_idx][1].imshow(filtered, cmap="gray")
-        axs[channel_idx][2].imshow(tophat, cmap="gray")
+        axs[channel_idx][0].imshow(channel_img, cmap="gray", interpolation='none')
+        axs[channel_idx][1].imshow(filtered, cmap="gray", interpolation='none')
+        axs[channel_idx][2].imshow(tophat, cmap="gray", interpolation='none')
 
         axs[0][0].set_title("Raw Cell Image")
         axs[0][1].set_title("Hist Equalized and Guassian Filtered")
@@ -55,9 +55,9 @@ def thresholding_vis(img, channels):
 
         thresh1, thresh2, thresh3 = threshold_image(tophat, thresh_ps[channel_idx])
 
-        axs[channel_idx][0].imshow(thresh1, cmap="gray")
-        axs[channel_idx][1].imshow(thresh2, cmap="gray")
-        axs[channel_idx][2].imshow(thresh3, cmap="gray")
+        axs[channel_idx][0].imshow(thresh1, cmap="gray", interpolation='none')
+        axs[channel_idx][1].imshow(thresh2, cmap="gray", interpolation='none')
+        axs[channel_idx][2].imshow(thresh3, cmap="gray", interpolation='none')
 
         axs[0][0].set_title("Threshold")
         axs[0][1].set_title("Mean Threshold")
@@ -74,7 +74,7 @@ def plot_convex_hull(
     show: bool = True,
 ) -> None:
     hull_closed = np.vstack([hull, hull[0]])
-    plt.imshow(binary_img, cmap="gray")
+    plt.imshow(binary_img, cmap="gray", interpolation='none')
     plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
     plt.title("Convex Hull")
     if show:
@@ -86,7 +86,7 @@ def plot_hulls_of_clusters(
     hulls: Dict[int, List[Point]],
     show: bool = True,
 ) -> None:
-    plt.imshow(img, cmap="gray")
+    plt.imshow(img, cmap="gray", interpolation='none')
     for cluster, hull in hulls.items():
         hull_closed = np.vstack([hull, hull[0]])
         plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
@@ -101,7 +101,7 @@ def plot_COMs_of_clusters(
     COMs: Dict[int, Point],
     show: bool = True,
 ) -> None:
-    plt.imshow(img, cmap="gray")
+    plt.imshow(img, cmap="gray", interpolation='none')
     for cluster, hull in hulls.items():
         hull_closed = np.vstack([hull, hull[0]])
         plt.plot(hull_closed[:, 0], hull_closed[:, 1], "r", linewidth=2)
@@ -118,7 +118,9 @@ def plot_full_image(
     show: bool = True,
     channel_names = ["Cilia", "Golgi", "Cilia Base"],
     title: str =  None,
+    gray_scale: bool = True,
 ) -> None:
+    cmap = plt.cm.gray if gray_scale else plt.cm.tab20
     fig, ax = plt.subplots(
         1,
         len(channel_names),
@@ -127,7 +129,7 @@ def plot_full_image(
     if title:
         fig.suptitle(title)
     for channel_idx, channel in enumerate(channel_names):
-        ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+        ax[channel_idx].imshow(img[channel_idx], cmap=cmap, interpolation='none')
         ax[channel_idx].set_title(channel)
     if show:
         plt.show()
@@ -150,7 +152,7 @@ def plot_full_image_of_hulls(
 
     for channel_idx, channel_name in enumerate(channel_names):
 
-        ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+        ax[channel_idx].imshow(img[channel_idx], cmap="gray", interpolation='none')
 
         for cluster, hull in hulls[channel_idx].items():
             hull_closed = np.vstack([hull, hull[0]])
@@ -189,7 +191,7 @@ def plot_full_image_of_clusters_and_COMs(
 
     for channel_idx, channel_name in enumerate(channel_names):
 
-        ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+        ax[channel_idx].imshow(img[channel_idx], cmap="gray", interpolation='none')
 
         for cluster, hull in hulls[channel_idx].items():
             hull_closed = np.vstack([hull, hull[0]])

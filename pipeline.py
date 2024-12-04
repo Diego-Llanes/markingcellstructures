@@ -19,6 +19,7 @@ from visualizations import (
     plot_COMs_of_clusters,
     plot_full_image_of_clusters_and_COMs,
     plot_full_image,
+    plot_full_image_of_hulls,
 )
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
@@ -119,16 +120,17 @@ def process_image(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         channel_names=["Cilia", "Golgi", "Cilia Base"],
         title="Clusters in Each Channel",
         show=True,
+        gray_scale=False,
     )
     # hulls
-    plot_hulls_of_clusters(
-        img=[image[best_zslice][i] for i in range(3)],
+    plot_full_image_of_hulls(
+        img=[image[all_zslices[i]][i] for i in range(3)],
         hulls=all_hulls,
         show=True,
     )
     # COMs
     plot_full_image_of_clusters_and_COMs(
-        img=[image[best_zslice][i] for i in range(3)],
+        img=[image[all_zslices[i]][i] for i in range(3)],
         hulls=all_hulls,
         COMs=all_COMs,
         show=True,
