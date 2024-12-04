@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
-from functions import find_best_zslices, threshold_image, find_clusters, determine_best_parameters
+from functions import find_best_zslices, threshold_image, find_clusters, compute_threshold
 
 DATA_DIR = Path("data")
 
@@ -88,7 +88,7 @@ def main():
         zslice = 24 # find_best_zslices(channel_img)
         best_slice = channel_img[zslice]
         
-        threshold = determine_best_parameters(best_slice, (95, 96))
+        thresholded = compute_threshold(best_slice, (95, 96))
         # for channel_idx, channel in enumerate(channels):
             # channel_img = img[:, channel_idx]
             # zslice = 24 # find_best_zslices(channel_img)
