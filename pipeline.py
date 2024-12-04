@@ -66,12 +66,18 @@ python pipeline.py --data_dir <path_to_data_dir> # to process all images in the 
         action="store_true",
         help="Show the plots",
     )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Threshold percent [0.0, 1.0]",
+    )
     args = parser.parse_args()
     assert not (args.data_dir and args.image), "Please provide either --data_dir or --image"
     return args
 
 
-def process_image(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarray, np.ndarray]:
 
     all_COMs = []
     all_hulls = []
@@ -86,7 +92,8 @@ def process_image(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         channel_img = channel_img[best_zslice]
 
         # TODO: thresholding @Parker
-        binary_img = threshold_image(channel_img, 0.7)
+        threshold = threshold if threshold is not None else 0.3
+        binary_img = threshold_image(channel_img, threshold)
 
         # find clusters
         clusters = find_clusters(
@@ -139,9 +146,11 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
 
+    threshold_percent = args.threshold
+
     if args.image:
         image = tifffile.imread(args.image)
-        final_COMS, final_hulls, final_zslices = process_image(image)
+        final_COMS, final_hulls, final_zslices = process_image(image, threshold_percent)
         img_channels: List[np.ndarray] = [image[final_zslices[i]][i] for i in range(3)]
         if args.show:
             plot_full_image_of_clusters_and_COMs(
