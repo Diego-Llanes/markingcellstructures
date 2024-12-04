@@ -17,9 +17,9 @@ from visualizations import (
 )
 
 
-TIF_FILE = Path("data/_1_MMStack_Pos0.ome.tif")
+TIF_FILE = Path("data/1-20_Stack_41_MMStack_Pos0.ome.tif")
 CHANNEL_TO_VIEW = 2
-PERCENTAGE_THRESHOLD = 0.3
+PERCENTAGE_THRESHOLD = 0.4
 EPS = 5
 MIN_SAMPLES = 20
 
@@ -87,6 +87,7 @@ def test_channel_wise_cluster_alignment():
         ],
         hulls=final_hulls,
         COMs=final_COMS,
+        triplets=final_triplet_of_cluster_ids,
         channel_names=["Cilia", "Golgi", "Cilia Base"],
     )
 
