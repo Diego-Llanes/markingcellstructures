@@ -1,15 +1,8 @@
 import tifffile
-import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-import matplotlib.colors as mcolors
-from matplotlib.colors import ListedColormap, BoundaryNorm
-from sklearn.cluster import DBSCAN
 
 from pathlib import Path
 from typing import List, Tuple, Dict
-from collections import namedtuple
 from argparse import ArgumentParser
 
 from functions import (
@@ -25,11 +18,12 @@ from visualizations import (
     plot_hulls_of_clusters,
     plot_COMs_of_clusters,
     plot_full_image_of_clusters_and_COMs,
+    plot_full_image,
 )
 
 DATA_DIR = Path("/research/jagodzinski/markingcellstructures")
 EPS = (3, 12, 5)
-MIN_SAMPLES = (10, 70, 75)
+MIN_SAMPLES = (25, 70, 50)
 
 """
 notes:
@@ -66,24 +60,21 @@ python pipeline.py --data_dir <path_to_data_dir> # to process all images in the 
         action="store_true",
         help="Show the plots",
     )
-    parser.add_argument(
-        "--threshold",
-        type=float,
-        default=None,
-        help="Threshold percent [0.0, 1.0]",
-    )
     args = parser.parse_args()
     assert not (args.data_dir and args.image), "Please provide either --data_dir or --image"
     return args
 
 
-def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarray, np.ndarray]:
+def process_image(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
     all_COMs = []
     all_hulls = []
     all_zslices = []
+    all_binary_imgs = []
+    all_clusters = []
 
-    for i in range(3):
+    for i, channel in enumerate(["Cilia", "Golgi", "Cilia Base"]):
+        print(f"Processing {channel} channel...")
         # get the channel
         channel_img = image[:, i]
 
@@ -91,9 +82,8 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
         all_zslices.append(best_zslice)
         channel_img = channel_img[best_zslice]
 
-        # TODO: thresholding @Parker
-        threshold = threshold if threshold is not None else 0.3
         binary_img = compute_best_threshold(i, channel_img)
+        all_binary_imgs.append(binary_img)
 
         # find clusters
         clusters = find_clusters(
@@ -101,6 +91,7 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
             eps=EPS[i],
             min_samples=MIN_SAMPLES[i],
         )
+        all_clusters.append(clusters)
 
         convex_hulls = get_convex_hull_for_each_cluster(
             binary_img,
@@ -114,6 +105,12 @@ def process_image(image: np.ndarray, threshold: float = None) -> Tuple[np.ndarra
         )
 
         all_COMs.append(COMs)
+
+    plot_full_image(
+        img=all_binary_imgs,
+        show=True,
+        channel_names=["Cilia", "Golgi", "Cilia Base"],
+    )
 
     final_triplet_of_cluster_ids, good_cluster_ids = channel_wise_cluster_alignment(
         all_COMs,
@@ -146,11 +143,9 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
 
-    threshold_percent = args.threshold
-
     if args.image:
         image = tifffile.imread(args.image)
-        final_COMS, final_hulls, final_zslices = process_image(image, threshold_percent)
+        final_COMS, final_hulls, final_zslices = process_image(image)
         img_channels: List[np.ndarray] = [image[final_zslices[i]][i] for i in range(3)]
         if args.show:
             plot_full_image_of_clusters_and_COMs(

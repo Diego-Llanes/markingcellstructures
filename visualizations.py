@@ -111,6 +111,24 @@ def plot_COMs_of_clusters(
     if show:
         plt.show()
 
+
+def plot_full_image(
+    img: List[np.ndarray],
+    show: bool = True,
+    channel_names = ["Cilia", "Golgi", "Cilia Base"],
+) -> None:
+    fig, ax = plt.subplots(
+        1,
+        len(channel_names),
+        figsize=(5 * len(channel_names), 5)
+    )
+    for channel_idx, channel in enumerate(channel_names):
+        ax[channel_idx].imshow(img[channel_idx], cmap="gray")
+        ax[channel_idx].set_title(channel)
+    if show:
+        plt.show()
+
+
 def plot_full_image_of_clusters_and_COMs(
     img: list[np.ndarray],
     hulls: List[Dict[int, List[Point]]],
